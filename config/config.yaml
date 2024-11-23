@@ -1,0 +1,68 @@
+# EXPERIMENT TYPE
+experiment_type: "centralized_scheduling"  # "uncoordinated" or "centralized_scheduling"
+
+# SIMULATION PARAMETERS
+time_range: [10, 22]  # Time from 10 AM to 10 PM
+market_prices: [0.45, 0.30, 0.20, 0.25, 0.35, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]  # Simulating solar power peak (low from 11 AM to 3 PM)
+
+evs:
+  - id: 1
+    disconnect_time: 14
+    battery_capacity: 50
+    soc_threshold: 15 # 30 % of the battery capacity
+    initial_soc: 20
+    desired_soc: 40
+    max_charge_rate: 10
+    max_discharge_rate: 10
+    min_soc: 0
+    battery_wear_cost_coefficient: 0.05
+    disconnection_time_preference_coefficient: 2
+  - id: 2
+    disconnect_time: 17
+    battery_capacity: 50
+    soc_threshold: 15 # 30 % of the battery capacity
+    initial_soc: 20
+    desired_soc: 40
+    max_charge_rate: 10
+    max_discharge_rate: 10
+    min_soc: 0
+    battery_wear_cost_coefficient: 0.05
+    disconnection_time_preference_coefficient: 2
+  - id: 3
+    disconnect_time: 17
+    battery_capacity: 50
+    soc_threshold: 15 # 30 % of the battery capacity
+    initial_soc: 20
+    desired_soc: 40
+    max_charge_rate: 10
+    max_discharge_rate: 10
+    min_soc: 0
+    battery_wear_cost_coefficient: 0.05
+    disconnection_time_preference_coefficient: 2
+  - id: 4
+    disconnect_time: 18
+    battery_capacity: 50
+    soc_threshold: 15 # 30 % of the battery capacity
+    initial_soc: 20
+    desired_soc: 40
+    max_charge_rate: 10
+    max_discharge_rate: 10
+    min_soc: 0
+    battery_wear_cost_coefficient: 0.05
+    disconnection_time_preference_coefficient: 2
+  - id: 5
+    disconnect_time: 20
+    battery_capacity: 50
+    soc_threshold: 15 # 30 % of the battery capacity
+    initial_soc: 20
+    desired_soc: 40
+    max_charge_rate: 10
+    max_discharge_rate: 10
+    min_soc: 0
+    battery_wear_cost_coefficient: 0.05
+    disconnection_time_preference_coefficient: 2
+
+# METRICS/RESULTS
+plots:
+  - objective_vs_cost
+  - soc_evolution
