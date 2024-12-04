@@ -1,68 +1,80 @@
+# NAME XP
+name_xp: "fake_data_demo_xp"
+
 # EXPERIMENT TYPE
-experiment_type: "centralized_scheduling"  # "uncoordinated" or "centralized_scheduling"
+experiment_types: ["uncoordinated", "centralized_scheduling", "inelastic_centralized_scheduling"]  
+    # "uncoordinated" or "centralized_scheduling" or "inelastic_centralized_scheduling"
+
+# NUMBER OF RUNS
+num_runs: 10
 
 # SIMULATION PARAMETERS
+stochastic: false
 time_range: [10, 22]  # Time from 10 AM to 10 PM
-market_prices: [0.45, 0.30, 0.20, 0.25, 0.35, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85, 0.95]  # Simulating solar power peak (low from 11 AM to 3 PM)
+seed: 42
+market_prices: [37.03, 35.75, 42.48, 42.81, 43.1, 43.12, 42.71, 43.16, 53.1, 46.22, 44.31, 43.25]
+market_prices_csv: "C:/Users/sabri/Projects/v2g_mechanism_project/data/processed/day_ahead_prices/hub_prices.csv"
 
 evs:
-  - id: 1
-    disconnect_time: 14
-    battery_capacity: 50
-    soc_threshold: 15 # 30 % of the battery capacity
-    initial_soc: 20
-    desired_soc: 40
-    max_charge_rate: 10
-    max_discharge_rate: 10
+  - id: 0
+    disconnect_time: 14 # should be between time_range[0]+1 and time_range[1] (included)
+    battery_capacity: 40
+    soc_threshold: 12 # 30 % of the battery capacity
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 40
+    max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.05
+    battery_wear_cost_coefficient: 0.23
+    disconnection_time_preference_coefficient: 2
+  - id: 1
+    disconnect_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
+    battery_capacity: 40
+    soc_threshold: 12 # 30 % of the battery capacity
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 40
+    max_discharge_rate: 7
+    min_soc: 0
+    battery_wear_cost_coefficient: 0.23
     disconnection_time_preference_coefficient: 2
   - id: 2
-    disconnect_time: 17
-    battery_capacity: 50
-    soc_threshold: 15 # 30 % of the battery capacity
-    initial_soc: 20
-    desired_soc: 40
-    max_charge_rate: 10
-    max_discharge_rate: 10
+    disconnect_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
+    battery_capacity: 40
+    soc_threshold: 12 # 30 % of the battery capacity
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 40
+    max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.05
+    battery_wear_cost_coefficient: 0.23
     disconnection_time_preference_coefficient: 2
   - id: 3
-    disconnect_time: 17
-    battery_capacity: 50
-    soc_threshold: 15 # 30 % of the battery capacity
-    initial_soc: 20
-    desired_soc: 40
-    max_charge_rate: 10
-    max_discharge_rate: 10
+    disconnect_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
+    battery_capacity: 40
+    soc_threshold: 12 # 30 % of the battery capacity
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 40
+    max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.05
+    battery_wear_cost_coefficient: 0.23
     disconnection_time_preference_coefficient: 2
   - id: 4
-    disconnect_time: 18
-    battery_capacity: 50
-    soc_threshold: 15 # 30 % of the battery capacity
-    initial_soc: 20
-    desired_soc: 40
-    max_charge_rate: 10
-    max_discharge_rate: 10
+    disconnect_time: 20 # should be between time_range[0]+1 and time_range[1] (included)
+    battery_capacity: 40
+    soc_threshold: 12 # 30 % of the battery capacity
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 40
+    max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.05
-    disconnection_time_preference_coefficient: 2
-  - id: 5
-    disconnect_time: 20
-    battery_capacity: 50
-    soc_threshold: 15 # 30 % of the battery capacity
-    initial_soc: 20
-    desired_soc: 40
-    max_charge_rate: 10
-    max_discharge_rate: 10
-    min_soc: 0
-    battery_wear_cost_coefficient: 0.05
+    battery_wear_cost_coefficient: 0.23
     disconnection_time_preference_coefficient: 2
 
 # METRICS/RESULTS
 plots:
   - objective_vs_cost
   - soc_evolution
+  - market_prices
+  - objective_bars

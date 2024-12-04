@@ -2,28 +2,32 @@ from experiments.base_experiment import BaseExperiment
 from gurobipy import Model, GRB
 
 
-class CentralizedSchedulingExperiment(BaseExperiment):
+class InelasticCentralizedSchedulingExperiment(BaseExperiment):
     def solve_ev_schedule(self, ev, market_prices, T, start_time, end_time):
         # Gurobi model for a single EV
         model = Model(f"EV_Scheduling_{ev['id']}")
 
+        # Fixed disconnection time index
+        # Disconnection time should be between start_time + 1 and end_time (inclusive)
+        if ev["disconnect_time"] < start_time + 1 or ev["disconnect_time"] > end_time:
+            raise ValueError(f"Disconnection time {ev['disconnect_time']} is out of valid range.")
+
+        # Adjust t_disconnect to be within 1 to T (1-based indexing)
+        t_disconnect = ev["disconnect_time"] - start_time  # Now t_disconnect is between 1 and T
+
         # Variables
         u = model.addVars(T, lb=-ev["max_discharge_rate"], ub=ev["max_charge_rate"], name="u")
-        soc = model.addVars(T + 1, lb=0, ub=ev["battery_capacity"], name="soc")
-        b = model.addVars(T, vtype=GRB.BINARY, name="b")  # Binary variables for disconnection time
-        t_actual = model.addVar(vtype=GRB.INTEGER, lb=start_time + 1, ub=end_time, name="t_actual")
+        soc = model.addVars(T+1, lb=0, ub=ev["battery_capacity"], name="soc")
         abs_u = model.addVars(T, lb=0, name="abs_u")  # Auxiliary variables for |u|
         z = model.addVars(T, vtype=GRB.BINARY, name="z")  # Binary variables for SoC threshold
-        delta = model.addVars(T, vtype=GRB.BINARY, name="delta")  # Binary variables indicating t < t_actual
 
         # Big-M constant
         M = ev["battery_capacity"] + ev["max_charge_rate"] * T  # Should be large enough
 
         # Coefficients
         beta = ev["battery_wear_cost_coefficient"]
-        alpha = ev["disconnection_time_preference_coefficient"]
 
-        # Objective: Minimize operator objective (energy cost + wear cost + disconnection cost)
+        # Objective: Minimize operator objective (energy cost + wear cost)
         operator_objective = 0
         energy_cost = 0
 
@@ -32,9 +36,6 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             energy_cost += market_prices[t] * u[t]
             # Operator objective includes wear cost
             operator_objective += beta * abs_u[t]
-
-        # Add disconnection time cost to operator objective
-        operator_objective += 0.5 * alpha * (ev["disconnect_time"] - t_actual) ** 2
 
         # Full operator objective includes energy cost
         operator_objective += energy_cost
@@ -45,45 +46,33 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         # Initial SoC constraint
         model.addConstr(soc[0] == ev["initial_soc"], "InitialSoC")
 
-        # Link t_actual with binary variables
-        model.addConstr(t_actual == sum((t + start_time + 1) * b[t] for t in range(T)), "tActualLink")
-
-        # Ensure only one disconnection time is selected
-        model.addConstr(sum(b[t] for t in range(T)) == 1, "OneDisconnectionTime")
-
-        # Final SoC constraint based on binary variables
-        for t in range(T):
-            model.addConstr(soc[t + 1] >= ev["desired_soc"] - (1 - b[t]) * M, f"FinalSoCPos_{t}")
-            model.addConstr(soc[t + 1] <= ev["desired_soc"] + (1 - b[t]) * M, f"FinalSoCNeg_{t}")
-
         # SoC dynamics
         for t in range(T):
             model.addConstr(soc[t + 1] == soc[t] + u[t], f"SoCDynamics_{t}")
 
-        # Charging/discharging limits and ensure u[t] == 0 when t >= t_actual
+        # Final SoC constraint at fixed disconnection time
+        # t_disconnect ranges from 1 to T (inclusive)
+        model.addConstr(soc[t_disconnect] == ev["desired_soc"], "FinalSoC")
+
+        # Charging/discharging limits and ensure u[t] == 0 when t >= t_disconnect
         for t in range(T):
             # Ensure abs_u tracks absolute value of u
             model.addConstr(abs_u[t] >= u[t], f"AbsU_Pos_{t}")
             model.addConstr(abs_u[t] >= -u[t], f"AbsU_Neg_{t}")
 
             # SoC threshold constraints
-            model.addConstr(soc[t + 1] >= ev["soc_threshold"] - M * (1 - z[t]), f"SoCThresholdLower_{t}")
-            model.addConstr(soc[t + 1] <= ev["soc_threshold"] + M * z[t], f"SoCThresholdUpper_{t}")
+            model.addConstr(soc[t+1] >= ev["soc_threshold"] - M * (1 - z[t]), f"SoCThresholdLower_{t}")
+            model.addConstr(soc[t+1] <= ev["soc_threshold"] + M * z[t], f"SoCThresholdUpper_{t}")
 
             # Discharge limit based on SoC threshold
             model.addConstr(u[t] >= -ev["max_discharge_rate"] * z[t], f"DischargeLimit_{t}")
 
-            # Define delta[t] to indicate if t < t_actual
-            model.addConstr(t_actual - (t + start_time) >= 1 - M * (1 - delta[t]), f"Delta_Definition1_{t}")
-            model.addConstr(t_actual - (t + start_time) <= M * delta[t], f"Delta_Definition2_{t}")
+            # Ensure u[t] == 0 when t >= t_disconnect
+            if t >= t_disconnect:
+                model.addConstr(u[t] == 0, f"ZeroChargeAfterDisconnect_{t}")
 
-            # Charging/discharging limits dependent on delta[t]
-            model.addConstr(u[t] <= ev["max_charge_rate"] * delta[t], f"MaxChargeRate_{t}")
-            model.addConstr(u[t] >= -ev["max_discharge_rate"] * delta[t], f"MinDischargeRate_{t}")
-
-        # Minimum SoC constraints
-        for t in range(T + 1):
-            model.addConstr(soc[t] >= ev["min_soc"], f"MinSoC_{t}")
+            # Minimum SoC
+            model.addConstr(soc[t+1] >= ev["min_soc"], f"MinSoC_{t}")
 
         # Solve model
         model.optimize()
@@ -91,8 +80,8 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         # Extract results
         schedule = {
             "u": [u[t].X for t in range(T)],
-            "soc": [soc[t].X for t in range(T + 1)],
-            "t_actual": t_actual.X,
+            "soc": [soc[t].X for t in range(T+1)],
+            "t_actual": ev["disconnect_time"],
             "energy_cost": sum(market_prices[t] * u[t].X for t in range(T)),
             "total_cost": model.ObjVal,
         }
@@ -140,4 +129,3 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             "actual_disconnect_time": actual_disconnect_time,
         }
         return self.results
-
