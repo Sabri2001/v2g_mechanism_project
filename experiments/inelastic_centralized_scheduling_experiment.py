@@ -26,16 +26,17 @@ class InelasticCentralizedSchedulingExperiment(BaseExperiment):
 
         # Coefficients
         beta = ev["battery_wear_cost_coefficient"]
+        energy_efficiency = ev["energy_efficiency"]
 
         # Objective: Minimize operator objective (energy cost + wear cost)
         operator_objective = 0
         energy_cost = 0
 
         for t in range(T):
-            # Energy cost
+            # Energy cost (based on delivered energy)
             energy_cost += market_prices[t] * u[t]
-            # Operator objective includes wear cost
-            operator_objective += beta * abs_u[t]
+            # Operator objective includes wear cost (based on usable energy)
+            operator_objective += beta * abs_u[t] * energy_efficiency
 
         # Full operator objective includes energy cost
         operator_objective += energy_cost
@@ -46,12 +47,11 @@ class InelasticCentralizedSchedulingExperiment(BaseExperiment):
         # Initial SoC constraint
         model.addConstr(soc[0] == ev["initial_soc"], "InitialSoC")
 
-        # SoC dynamics
+        # SoC dynamics (using energy_efficiency)
         for t in range(T):
-            model.addConstr(soc[t + 1] == soc[t] + u[t], f"SoCDynamics_{t}")
+            model.addConstr(soc[t + 1] == soc[t] + u[t] * energy_efficiency, f"SoCDynamics_{t}")
 
         # Final SoC constraint at fixed disconnection time
-        # t_disconnect ranges from 1 to T (inclusive)
         model.addConstr(soc[t_disconnect] == ev["desired_soc"], "FinalSoC")
 
         # Charging/discharging limits and ensure u[t] == 0 when t >= t_disconnect
@@ -109,8 +109,12 @@ class InelasticCentralizedSchedulingExperiment(BaseExperiment):
 
             # Combine costs for each time step
             for t in range(T):
+                # Energy cost remains based on delivered energy
                 energy_cost = ev_schedule["u"][t] * market_prices[t]
-                wear_cost = ev["battery_wear_cost_coefficient"] * abs(ev_schedule["u"][t])
+                # Wear cost now based on usable energy
+                usable_energy = ev_schedule["u"][t] * ev["energy_efficiency"]
+                wear_cost = ev["battery_wear_cost_coefficient"] * abs(usable_energy)
+
                 operator_objective_vector[t] += energy_cost + wear_cost
                 energy_cost_vector[t] += energy_cost
 

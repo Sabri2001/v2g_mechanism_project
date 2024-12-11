@@ -1,4 +1,3 @@
-# main.py
 from datetime import datetime
 import os
 
@@ -7,7 +6,7 @@ from experiments.uncoordinated_charging_experiment import UncoordinatedChargingE
 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
 from experiments.inelastic_centralized_scheduling_experiment import InelasticCentralizedSchedulingExperiment
 from results.result_handler import ResultHandler
-from results.summary_result_handler import SummaryResultHandler  # Import the new class
+from results.summary_result_handler import SummaryResultHandler
 
 
 def run_experiment(experiment_class, config, timestamp, experiment_type, run_id, sampled_day_data):

@@ -7,6 +7,9 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         # Gurobi model for a single EV
         model = Model(f"EV_Scheduling_{ev['id']}")
 
+        # Extract energy efficiency
+        energy_efficiency = ev["energy_efficiency"]
+
         # Variables
         u = model.addVars(T, lb=-ev["max_discharge_rate"], ub=ev["max_charge_rate"], name="u")
         soc = model.addVars(T + 1, lb=0, ub=ev["battery_capacity"], name="soc")
@@ -30,8 +33,8 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         for t in range(T):
             # Energy cost
             energy_cost += market_prices[t] * u[t]
-            # Operator objective includes wear cost
-            operator_objective += beta * abs_u[t]
+            # Operator objective includes wear cost, now scaled by energy_efficiency
+            operator_objective += beta * abs_u[t] * energy_efficiency
 
         # Add disconnection time cost to operator objective
         operator_objective += 0.5 * alpha * (ev["disconnect_time"] - t_actual) ** 2
@@ -56,9 +59,9 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             model.addConstr(soc[t + 1] >= ev["desired_soc"] - (1 - b[t]) * M, f"FinalSoCPos_{t}")
             model.addConstr(soc[t + 1] <= ev["desired_soc"] + (1 - b[t]) * M, f"FinalSoCNeg_{t}")
 
-        # SoC dynamics
+        # SoC dynamics with energy_efficiency
         for t in range(T):
-            model.addConstr(soc[t + 1] == soc[t] + u[t], f"SoCDynamics_{t}")
+            model.addConstr(soc[t + 1] == soc[t] + u[t] * energy_efficiency, f"SoCDynamics_{t}")
 
         # Charging/discharging limits and ensure u[t] == 0 when t >= t_actual
         for t in range(T):
@@ -120,8 +123,12 @@ class CentralizedSchedulingExperiment(BaseExperiment):
 
             # Combine costs for each time step
             for t in range(T):
+                # Energy cost remains based on delivered energy
                 energy_cost = ev_schedule["u"][t] * market_prices[t]
-                wear_cost = ev["battery_wear_cost_coefficient"] * abs(ev_schedule["u"][t])
+                # Wear cost now based on usable energy
+                usable_energy = ev_schedule["u"][t] * ev["energy_efficiency"]
+                wear_cost = ev["battery_wear_cost_coefficient"] * abs(usable_energy)
+
                 operator_objective_vector[t] += energy_cost + wear_cost
                 energy_cost_vector[t] += energy_cost
 
@@ -140,4 +147,3 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             "actual_disconnect_time": actual_disconnect_time,
         }
         return self.results
-

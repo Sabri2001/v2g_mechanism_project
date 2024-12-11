@@ -1,15 +1,15 @@
 # NAME XP
-name_xp: "fake_data_demo_xp"
+name_xp: "test_energy_effiency_xp"
 
 # EXPERIMENT TYPE
-experiment_types: ["uncoordinated", "centralized_scheduling", "inelastic_centralized_scheduling"]  
+experiment_types: ["inelastic_centralized_scheduling"]  
     # "uncoordinated" or "centralized_scheduling" or "inelastic_centralized_scheduling"
 
 # NUMBER OF RUNS
-num_runs: 10
+num_runs: 1
 
 # SIMULATION PARAMETERS
-stochastic: false
+stochastic: true
 time_range: [10, 22]  # Time from 10 AM to 10 PM
 seed: 42
 market_prices: [37.03, 35.75, 42.48, 42.81, 43.1, 43.12, 42.71, 43.16, 53.1, 46.22, 44.31, 43.25]
@@ -25,8 +25,9 @@ evs:
     max_charge_rate: 40
     max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.23
+    battery_wear_cost_coefficient: 0.13 # for Nissan Leaf
     disconnection_time_preference_coefficient: 2
+    energy_efficiency: 0.87
   - id: 1
     disconnect_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
@@ -36,8 +37,9 @@ evs:
     max_charge_rate: 40
     max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.23
+    battery_wear_cost_coefficient: 0.13
     disconnection_time_preference_coefficient: 2
+    energy_efficiency: 0.87
   - id: 2
     disconnect_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
@@ -47,8 +49,9 @@ evs:
     max_charge_rate: 40
     max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.23
+    battery_wear_cost_coefficient: 0.13
     disconnection_time_preference_coefficient: 2
+    energy_efficiency: 0.87
   - id: 3
     disconnect_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
@@ -58,8 +61,9 @@ evs:
     max_charge_rate: 40
     max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.23
+    battery_wear_cost_coefficient: 0.13
     disconnection_time_preference_coefficient: 2
+    energy_efficiency: 0.87
   - id: 4
     disconnect_time: 20 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
@@ -69,8 +73,9 @@ evs:
     max_charge_rate: 40
     max_discharge_rate: 7
     min_soc: 0
-    battery_wear_cost_coefficient: 0.23
+    battery_wear_cost_coefficient: 0.13
     disconnection_time_preference_coefficient: 2
+    energy_efficiency: 0.87
 
 # METRICS/RESULTS
 plots:

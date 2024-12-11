@@ -32,7 +32,8 @@ class UncoordinatedChargingExperiment(BaseExperiment):
             max_rate = ev["max_charge_rate"]
             disconnect_time = ev["disconnect_time"]
             beta = ev["battery_wear_cost_coefficient"]
-            ev_id = ev["id"]  # Assume each EV has a unique ID
+            ev_id = ev["id"]
+            energy_efficiency = ev["energy_efficiency"]
 
             for t in range(T):
                 actual_time = t + start_time  # Adjust time to match the actual time in the time range
@@ -44,16 +45,19 @@ class UncoordinatedChargingExperiment(BaseExperiment):
                         results["soc_over_time"][ev_id][t_remaining] = soc
                     break
 
-                # Determine power to charge
-                power = min(max_rate, desired_soc - soc)
-                soc += power
+                # Determine energy to charge (delivered energy)
+                energy = min(max_rate, desired_soc - soc)
+                
+                # Calculate usable energy (energy that contributes to SOC)
+                usable_energy = energy * energy_efficiency
+                soc += usable_energy  # Update SOC with usable energy
 
                 # Record the SOC for this EV at time t
                 results["soc_over_time"][ev_id][t + 1] = soc
 
                 # Calculate costs
-                energy_cost = market_prices[t] * power
-                wear_cost = beta * abs(power)  # Linear wear cost based on charging/discharging power
+                energy_cost = market_prices[t] * energy  # Based on delivered energy
+                wear_cost = beta * abs(usable_energy)  # Based on usable energy
 
                 # Update results
                 results["operator_objective_vector"][t] += energy_cost + wear_cost

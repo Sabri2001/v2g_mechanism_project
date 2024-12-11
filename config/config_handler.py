@@ -12,8 +12,10 @@ class ConfigHandler:
         self.sampled_data_per_run = []  # List to store sampled data per run_id
         self.gmm_alpha_model = None
         self.gmm_disconnection_model = None
+        self.initial_final_soc_kde_model = None
         self.random_state = None
         self.load_gmm_models()
+        self.load_kde_models()
 
     def load_gmm_models(self):
         """
@@ -32,6 +34,16 @@ class ConfigHandler:
             raise FileNotFoundError(f"GMM model not found at {disconnect_model_path}")
         with open(disconnect_model_path, "rb") as file:
             self.gmm_disconnection_model = pickle.load(file)
+
+    def load_kde_models(self):
+        """
+        Load KDE models for stochastic sampling of initial_soc and desired_soc as pairs.
+        """
+        initial_final_soc_kde_path = "models/initial_final_soc_kde.pkl"
+        if not os.path.exists(initial_final_soc_kde_path):
+            raise FileNotFoundError(f"KDE model not found at {initial_final_soc_kde_path}")
+        with open(initial_final_soc_kde_path, "rb") as file:
+            self.initial_final_soc_kde_model = pickle.load(file)
 
     def load_config(self):
         with open(self.config_path, "r") as file:
@@ -79,13 +91,14 @@ class ConfigHandler:
     def validate_ev(self, ev, time_range, stochastic):
         # Required EV attributes
         required_ev_fields = [
-            "id", "battery_capacity", "initial_soc", "desired_soc",
+            "id", "battery_capacity",
             "max_charge_rate", "max_discharge_rate", "min_soc",
             "battery_wear_cost_coefficient"
         ]
         # 'disconnect_time' and 'disconnection_time_preference_coefficient' are optional if stochastic is True
         if not stochastic:
             required_ev_fields.extend(["disconnect_time", "disconnection_time_preference_coefficient"])
+            required_ev_fields.extend(["initial_soc", "desired_soc"])
 
         for field in required_ev_fields:
             if field not in ev:
@@ -95,21 +108,11 @@ class ConfigHandler:
         if not isinstance(ev["id"], int):
             raise ValueError("EV id must be an integer.")
 
-        if not (0 <= ev["initial_soc"] <= ev["battery_capacity"]):
-            raise ValueError(f"EV with id {ev['id']} has an invalid initial state of charge.")
-        if not (0 <= ev["desired_soc"] <= ev["battery_capacity"]):
-            raise ValueError(f"EV with id {ev['id']} has an invalid desired state of charge.")
-        if ev["min_soc"] < 0 or ev["min_soc"] > ev["battery_capacity"]:
-            raise ValueError(f"EV with id {ev['id']} has an invalid min_soc value.")
-        if ev["max_charge_rate"] <= 0:
-            raise ValueError(f"EV with id {ev['id']} has an invalid max_charge_rate.")
-        if ev["max_discharge_rate"] <= 0:
-            raise ValueError(f"EV with id {ev['id']} has an invalid max_discharge_rate.")
-
         if not stochastic:
-            # Validate disconnect_time
-            if not (time_range[0] + 1 <= ev["disconnect_time"] <= time_range[1]):
-                raise ValueError(f"EV with id {ev['id']} has a disconnect_time out of the time_range.")
+            if not (0 <= ev["initial_soc"] <= ev["battery_capacity"]):
+                raise ValueError(f"EV with id {ev['id']} has an invalid initial state of charge.")
+            if not (0 <= ev["desired_soc"] <= ev["battery_capacity"]):
+                raise ValueError(f"EV with id {ev['id']} has an invalid desired state of charge.")
 
     def sample_data_per_run(self):
         """
@@ -147,13 +150,13 @@ class ConfigHandler:
 
         # Convert prices from $/MWh to $/kWh
         prices = [price / 1000 for price in sampled_row.iloc[0][time_columns].tolist()]
-        
+
         return {"date": day_date, "prices": prices}
 
     def sample_ev_parameters(self):
         """
-        Sample 'disconnection_time_preference_coefficient' and 'disconnect_time' for each EV using the GMM models.
-        Returns a list of EV configurations with sampled parameters.
+        Sample EV parameters including (initial_soc, desired_soc) from the KDE model,
+        as well as 'disconnection_time_preference_coefficient' and 'disconnect_time' from GMM models.
         """
         alpha_weights = self.gmm_alpha_model.weights_
         alpha_means = self.gmm_alpha_model.means_
@@ -186,13 +189,28 @@ class ConfigHandler:
 
             # Round to the nearest integer hour and ensure it's within the time range
             sampled_disconnect_time = int(round(sampled_disconnect_time))
-            # Adjust to ensure it's within the valid time range
             if sampled_disconnect_time < start_time + 1:
                 sampled_disconnect_time = start_time + 1
             elif sampled_disconnect_time > end_time:
                 sampled_disconnect_time = end_time
 
             ev_copy["disconnect_time"] = sampled_disconnect_time
+
+            # Sample (initial_soc, desired_soc) from KDE
+            while True:
+                sampled_soc_pair = self.initial_final_soc_kde_model.resample(1)
+                initial_soc_percentage = sampled_soc_pair[0][0]
+                desired_soc_percentage = sampled_soc_pair[1][0]
+
+                # Convert percentages to absolute values based on battery capacity
+                initial_soc = round(max(0, min((initial_soc_percentage / 100) * ev_copy["battery_capacity"], ev_copy["battery_capacity"])))
+                desired_soc = round(max(0, min((desired_soc_percentage / 100) * ev_copy["battery_capacity"], ev_copy["battery_capacity"])))
+
+                if desired_soc > initial_soc:
+                    break
+
+            ev_copy["initial_soc"] = initial_soc
+            ev_copy["desired_soc"] = desired_soc
 
             # Append the sampled EV configuration
             sampled_evs.append(ev_copy)
