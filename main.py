@@ -5,6 +5,7 @@ from config.config_handler import ConfigHandler
 from experiments.uncoordinated_charging_experiment import UncoordinatedChargingExperiment
 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
 from experiments.inelastic_centralized_scheduling_experiment import InelasticCentralizedSchedulingExperiment
+from experiments.coupled_centralized_scheduling_experiment import CoupledCentralizedSchedulingExperiment
 from results.result_handler import ResultHandler
 from results.summary_result_handler import SummaryResultHandler
 
@@ -41,7 +42,8 @@ def main(config_path):
     experiment_classes = {
         "uncoordinated": UncoordinatedChargingExperiment,
         "centralized_scheduling": CentralizedSchedulingExperiment,
-        "inelastic_centralized_scheduling": InelasticCentralizedSchedulingExperiment
+        "inelastic_centralized_scheduling": InelasticCentralizedSchedulingExperiment,
+        "coupled_centralized_scheduling": CoupledCentralizedSchedulingExperiment,
     }
 
     # Get experiment types

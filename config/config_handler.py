@@ -68,6 +68,12 @@ class ConfigHandler:
             if field not in self.config:
                 raise ValueError(f"Missing required config field: {field}")
 
+        # Validate evcs_power_limit
+        if not isinstance(self.config["evcs_power_limit"], (int, float)):
+            raise ValueError("evcs_power_limit must be a number (int or float).")
+        if self.config["evcs_power_limit"] <= 0:
+            raise ValueError("evcs_power_limit must be a positive value.")
+
         # Validate stochastic
         if not isinstance(self.config["stochastic"], bool):
             raise ValueError("stochastic must be a boolean value.")
@@ -198,7 +204,10 @@ class ConfigHandler:
 
             # Sample (initial_soc, desired_soc) from KDE
             while True:
-                sampled_soc_pair = self.initial_final_soc_kde_model.resample(1)
+                sampled_soc_pair = self.initial_final_soc_kde_model.resample(
+                    size=1, 
+                    seed=self.random_state.randint(0, 2**31)
+                )
                 initial_soc_percentage = sampled_soc_pair[0][0]
                 desired_soc_percentage = sampled_soc_pair[1][0]
 
