@@ -1,9 +1,10 @@
 # NAME XP
-name_xp: "test_coupled_xp"
+folder: "tests"
+name_xp: "uncoordinated"
 
 # EXPERIMENT TYPE
-experiment_types: ["coupled_centralized_scheduling"]  
-    # "uncoordinated" or "centralized_scheduling" or "inelastic_centralized_scheduling" or "coupled_centralized_scheduling"
+experiment_types: ["uncoordinated", "coordinated", "unidirectional_coordinated", "inelastic_coordinated"]  
+    # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated"
 
 # NUMBER OF RUNS
 num_runs: 1
@@ -15,10 +16,15 @@ seed: 42
 market_prices: [37.03, 35.75, 42.48, 42.81, 43.1, 43.12, 42.71, 43.16, 53.1, 46.22, 44.31, 43.25]
 market_prices_csv: "C:/Users/sabri/Projects/v2g_mechanism_project/data/processed/day_ahead_prices/hub_prices.csv"
 evcs_power_limit: 25
+alpha_factor: 1
+price_factor: 1
+alpha_model_path: "models/gmm_alpha.pkl"
+disconnection_model_path: "models/gmm_disconnection_model.pkl"
+soc_model_path: "models/initial_final_soc_kde.pkl"
 
 evs:
   - id: 0
-    disconnect_time: 14 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 14 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
     soc_threshold: 12 # 30 % of the battery capacity
     initial_soc: 15
@@ -30,7 +36,7 @@ evs:
     disconnection_time_preference_coefficient: 2
     energy_efficiency: 0.87
   - id: 1
-    disconnect_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
     soc_threshold: 12 # 30 % of the battery capacity
     initial_soc: 15
@@ -42,7 +48,7 @@ evs:
     disconnection_time_preference_coefficient: 2
     energy_efficiency: 0.87
   - id: 2
-    disconnect_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
     soc_threshold: 12 # 30 % of the battery capacity
     initial_soc: 15
@@ -54,7 +60,7 @@ evs:
     disconnection_time_preference_coefficient: 2
     energy_efficiency: 0.87
   - id: 3
-    disconnect_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
     soc_threshold: 12 # 30 % of the battery capacity
     initial_soc: 15
@@ -66,7 +72,7 @@ evs:
     disconnection_time_preference_coefficient: 2
     energy_efficiency: 0.87
   - id: 4
-    disconnect_time: 20 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 20 # should be between time_range[0]+1 and time_range[1] (included)
     battery_capacity: 40
     soc_threshold: 12 # 30 % of the battery capacity
     initial_soc: 15
@@ -80,7 +86,10 @@ evs:
 
 # METRICS/RESULTS
 plots:
-  - objective_vs_cost
+  - total_cost_vs_energy_cost
   - soc_evolution
   - market_prices
-  - objective_bars
+  - total_cost_bars
+  # - total_cost_benchmarking
+  # - v2g_fraction
+  # - evcs_power

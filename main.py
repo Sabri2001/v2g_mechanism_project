@@ -1,86 +1,116 @@
-from datetime import datetime
 import os
+import sys
+import logging
+from datetime import datetime
 
+# Experiments
 from config.config_handler import ConfigHandler
 from experiments.uncoordinated_charging_experiment import UncoordinatedChargingExperiment
-from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
-from experiments.inelastic_centralized_scheduling_experiment import InelasticCentralizedSchedulingExperiment
-from experiments.coupled_centralized_scheduling_experiment import CoupledCentralizedSchedulingExperiment
+from experiments.coordinated_scheduling_experiment import CoordinatedSchedulingExperiment
+from experiments.unidirectional_coordinated_scheduling_experiment import UnidirectionalCoordinatedSchedulingExperiment
+from experiments.inelastic_coordinated_scheduling_experiment import InelasticCoordinatedSchedulingExperiment
+
+# Results
 from results.result_handler import ResultHandler
 from results.summary_result_handler import SummaryResultHandler
 
 
-def run_experiment(experiment_class, config, timestamp, experiment_type, run_id, sampled_day_data):
+def run_experiment(experiment_class, config, output_dir, experiment_type, run_id, sampled_day_data):
     """
-    Helper function to initialize and run a single experiment.
+    Initializes and runs a single experiment, then saves the results.
     """
-    print(f"Running {experiment_type}, Run ID: {run_id}")
+    logging.info(f"Running {experiment_type}, Run ID: {run_id}")
 
-    # Add the sampled day's data to the config for logging
-    config["sampled_day_date"] = sampled_day_data["date"]
-
+    # Instantiate and run the experiment
     experiment = experiment_class(config)
     results = experiment.run()
 
-    # Pass the sampled day data to the result handler for logging
-    result_handler = ResultHandler(config, results, timestamp, experiment_type, run_id)
+    # Save results (plots, logs) for this run
+    result_handler = ResultHandler(config, results, output_dir, experiment_type, run_id)
     result_handler.save()
 
-    print(f"Completed {experiment_type}, Run ID: {run_id}")
+    logging.info(f"Completed {experiment_type}, Run ID: {run_id}")
 
 def main(config_path):
-    # Load configuration
+    """
+    Main entry point for running EV charging experiments.
+
+    Args:
+        config_path (str): Path to the YAML configuration file.
+    """
+    # Set up logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    # 1) Load Configuration
     config_handler = ConfigHandler(config_path)
     config = config_handler.load_config()
     sampled_data_per_run = config_handler.get_sampled_data_per_run()
-    print("Config loaded and validated.")
+    logging.info("Configuration loaded and validated.")
 
-    # Get timestamp for unique output directory
+    # 2) Create Output Directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    base_output_dir = os.path.join(
+        "outputs",
+        config.get("folder", "default_folder"),
+        f"{config.get('name_xp', 'default_xp')}_{timestamp}"
+    )
+    os.makedirs(base_output_dir, exist_ok=True)
 
-    # Map experiment types to classes
+    # 3) Map Experiment Types to Classes
     experiment_classes = {
         "uncoordinated": UncoordinatedChargingExperiment,
-        "centralized_scheduling": CentralizedSchedulingExperiment,
-        "inelastic_centralized_scheduling": InelasticCentralizedSchedulingExperiment,
-        "coupled_centralized_scheduling": CoupledCentralizedSchedulingExperiment,
+        "coordinated": CoordinatedSchedulingExperiment,
+        "unidirectional_coordinated": UnidirectionalCoordinatedSchedulingExperiment,
+        "inelastic_coordinated": InelasticCoordinatedSchedulingExperiment
     }
 
-    # Get experiment types
     experiment_types = config.get("experiment_types", [])
-
     if not experiment_types:
         raise ValueError("No experiment types specified in the configuration.")
 
-    # Base output directory
-    base_output_dir = os.path.join("outputs", f"{config.get('name_xp', 'default_xp')}_{timestamp}")
-
-    # Loop over runs
+    # 4) Run Each Experiment for Each Sampled Run
     for run_data in sampled_data_per_run:
         run_id = run_data["run_id"]
         sampled_day_data = run_data["sampled_day_data"]
         evs = run_data["evs"]
-        # Update the config with the sampled data for this run
+
+        # Update config with sampled data
         config["market_prices"] = sampled_day_data["prices"]
+        config["sampled_day_date"] = sampled_day_data["date"]
         config["evs"] = evs
 
+        # Run each requested experiment
         for experiment_type in experiment_types:
             if experiment_type not in experiment_classes:
-                print(f"Skipping invalid experiment type: {experiment_type}")
+                logging.warning(f"Skipping invalid experiment type: {experiment_type}")
                 continue
 
             experiment_class = experiment_classes[experiment_type]
-            run_experiment(experiment_class, config, timestamp, experiment_type, run_id, sampled_day_data)
+            run_experiment(
+                experiment_class=experiment_class,
+                config=config,
+                output_dir=base_output_dir,
+                experiment_type=experiment_type,
+                run_id=run_id,
+                sampled_day_data=sampled_day_data
+            )
 
-    print("All experiments completed.")
+    logging.info("All experiments completed.")
 
-    # Generate summary plots using SummaryResultHandler
-    if "objective_bars" in config.get("plots", []):
-        summary_handler = SummaryResultHandler(base_output_dir, experiment_types)
-        summary_handler.aggregate_results()
-        summary_handler.generate_summary_plots(config.get("plots", []))
+    # 5) Generate Summary Plots (Across All Runs)
+    summary_handler = SummaryResultHandler(base_output_dir, experiment_types)
+    summary_handler.aggregate_results()
+    summary_handler.generate_summary_plots(config.get("plots", []))
 
 
 if __name__ == "__main__":
-    config_file = "config/config.yaml"
+    if len(sys.argv) != 2:
+        print("Usage: python main.py <config_path>")
+        sys.exit(1)
+
+    config_file = sys.argv[1]
     main(config_file)

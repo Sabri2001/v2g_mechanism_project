@@ -4,6 +4,8 @@ __pycache__/
 
 # Ignore Outputs folder
 outputs/
+data/
+models/
 
 # Ignore virtual environment
 .env/
