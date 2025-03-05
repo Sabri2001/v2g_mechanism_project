@@ -51,6 +51,13 @@ def main(config_path):
     sampled_data_per_run = config_handler.get_sampled_data_per_run()
     logging.info("Configuration loaded and validated.")
 
+    start_time, end_time = config["time_range"]
+    granularity = config["granularity"]
+    T = (end_time - start_time) * granularity
+    dt = 1.0 / granularity
+    config["T"] = T
+    config["dt"] = dt
+
     # 2) Create Output Directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_output_dir = os.path.join(

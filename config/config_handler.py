@@ -52,9 +52,8 @@ class ConfigHandler:
         self.alpha_factor = self.config.get("alpha_factor", 1)
         self.price_factor = self.config.get("price_factor", 1)
 
-        # If you want to rename config["name_xp"] based on some condition, you could do it here.
-        # But typically, you'd just rely on the config field as-is.
-        # e.g., self.config["name_xp"] = self.config.get("name_xp", "default_xp_name")
+        if "granularity" not in self.config:
+            self.config["granularity"] = 1
 
         # Load models
         self._load_alpha_model(self.config["alpha_model_path"])
@@ -83,7 +82,7 @@ class ConfigHandler:
     # -------------------------------------------------------------------------
 
     def _load_alpha_model(self, alpha_model_path):
-        """Loads the GMM model for disconnection_time_preference_coefficient."""
+        """Loads the GMM model for disconnection_time_flexibility."""
         if not os.path.exists(alpha_model_path):
             raise FileNotFoundError(f"GMM model not found at {alpha_model_path}")
 
@@ -183,7 +182,7 @@ class ConfigHandler:
         # If not stochastic, these fields are also required
         if not self.config["stochastic"]:
             required_ev_fields += [
-                "disconnection_time", "disconnection_time_preference_coefficient",
+                "disconnection_time", "disconnection_time_flexibility",
                 "initial_soc", "desired_soc"
             ]
 
@@ -258,7 +257,7 @@ class ConfigHandler:
 
     def _sample_ev_parameters(self):
         """
-        Samples EV parameters (disconnection_time_preference_coefficient,
+        Samples EV parameters (disconnection_time_flexibility,
         disconnect_time, initial_soc, desired_soc) using the GMM/KDE models.
         """
         alpha_weights = self.gmm_alpha_model.weights_
@@ -275,12 +274,12 @@ class ConfigHandler:
         for ev in self.config["evs"]:
             ev_copy = ev.copy()
 
-            # 1) Sample disconnection_time_preference_coefficient
+            # 1) Sample disconnection_time_flexibility
             alpha_idx = self.random_state.choice(len(alpha_weights), p=alpha_weights)
             alpha_mean = alpha_means[alpha_idx][0]
             alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])  # 1D
             sampled_alpha = self.random_state.normal(loc=alpha_mean, scale=alpha_std)
-            ev_copy["disconnection_time_preference_coefficient"] = round(sampled_alpha * self.alpha_factor)
+            ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor)
 
             # 2) Sample disconnect_time
             disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)

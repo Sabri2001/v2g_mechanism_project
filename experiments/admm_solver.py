@@ -12,8 +12,8 @@ class ADMM:
         self,
         num_agents: int,
         T: int,
-        beta: float = 0.1,
-        beta_coefficient: float = 1.2,
+        nu: float = 0.1,
+        nu_multiplier: float = 1.2,
         max_iter: int = 100,
         tol: float = 1e-3,
         local_subproblem_fn=None,
@@ -23,7 +23,8 @@ class ADMM:
         Args:
             num_agents (int): Number of agents (EVs).
             T (int): Number of time steps.
-            beta (float): ADMM penalty parameter.
+            nu (float): ADMM penalty parameter.
+            nu  multiplier (float): ADMM penalty parameter multiplier, in adaptive step size rule.
             max_iter (int): Maximum number of ADMM iterations.
             tol (float): Convergence tolerance for dual changes.
             local_subproblem_fn (callable): A callback with signature (agent_idx, iteration_state).
@@ -31,8 +32,8 @@ class ADMM:
         """
         self.num_agents = num_agents
         self.T = T
-        self.beta = beta
-        self.beta_coefficient = beta_coefficient
+        self.nu = nu
+        self.nu_multiplier = nu_multiplier
         self.max_iter = max_iter
         self.tol = tol
 
@@ -82,7 +83,7 @@ class ADMM:
                 logging.info(f"ADMM converged after {iteration} iterations.")
                 break
             else:
-                self.beta *= self.beta_coefficient  # Increase penalty parameter for better convergence
+                self.nu *= self.nu_multiplier  # Increase penalty parameter for better convergence
 
         if iteration == self.max_iter - 1:
             logging.warning(f"ADMM reached max_iter={self.max_iter} without converging.")
@@ -92,10 +93,10 @@ class ADMM:
     def _snapshot_of_duals(self):
         """
         Returns a copy of whichever dual variables you want to monitor.
-        By default, we assume 'mu' might be your dual in iteration_state.
+        By default, we assume 'dual' might be your dual in iteration_state.
         """
-        if "mu" in self.iteration_state:
-            return self.iteration_state["mu"].copy()
+        if "dual" in self.iteration_state:
+            return self.iteration_state["dual"].copy()
         return None
 
     def _compute_dual_diff(self, old_dual, new_dual):

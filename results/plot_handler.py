@@ -50,7 +50,7 @@ class PlotHandler:
             # Get the EV-specific configuration
             ev = next(ev for ev in ev_config["evs"] if ev["id"] == ev_id)
             battery_capacity = ev["battery_capacity"]
-            min_soc = ev["min_soc"]
+            min_soc = 0
 
             # Normalize SoC
             raw_soc = np.array(schedule_results["soc_over_time"][ev_id])
@@ -431,7 +431,7 @@ class PlotHandler:
         """
         Plot a heatmap (grid) of the target EV's utility as a function of its bid parameters.
         - tau_values (x-axis): candidate disconnection_time bids.
-        - alpha_values (y-axis): candidate disconnection_time_preference_coefficient bids.
+        - alpha_values (y-axis): candidate disconnection_time_flexibility bids.
         - cost_grid: a 2D array (shape: len(alpha_values) x len(tau_values))
           where each cell is the EV's utility computed as energy_cost + congestion_cost + adaptability_cost.
         - If true_tau and true_alpha are provided, the cell matching these values is highlighted with a thick yellow border.

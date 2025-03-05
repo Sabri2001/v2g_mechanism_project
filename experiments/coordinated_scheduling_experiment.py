@@ -21,7 +21,9 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         """
         # 1) Extract data from config
         start_time, end_time = self.config["time_range"]
-        T = end_time - start_time
+        T = self.config["T"]
+        dt = self.config["dt"]
+        granularity = self.config["granularity"]
         evs = self.config["evs"]
         market_prices = self.config["market_prices"]
         evcs_power_limit = self.config["evcs_power_limit"]
@@ -31,18 +33,18 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             "u": np.zeros((len(evs), T)),
             "soc": np.zeros((len(evs), T + 1)),
             "t_actual": np.zeros(len(evs), dtype=int),
-            "mu": np.zeros(T),  # dual variable for the global constraint
+            "dual": np.zeros(T),  # dual variable for the global constraint
         }
 
         # 3) Build an ADMM instance
         self.admm_solver = ADMM(
             num_agents=len(evs),
             T=T,
-            beta=0.1,
-            beta_coefficient=1,
+            nu=0.1,
+            nu_multiplier=1,
             max_iter=100,
             tol=1e-3,
-            local_subproblem_fn=lambda ev_idx, st, old_st: self._solve_local_subproblem(evs, ev_idx, st, old_st, market_prices, start_time, end_time),
+            local_subproblem_fn=lambda ev_idx, st, old_st: self._solve_local_subproblem(evs, ev_idx, st, old_st, market_prices, start_time, end_time, T, dt, granularity),
             global_step_fn=lambda st: self._global_step(st, evcs_power_limit)
         )
         self.admm_solver.iteration_state = iteration_state
@@ -52,7 +54,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         final_state = self.admm_solver.solve()
 
         # 5) Aggregate results (costs, SoC, etc.)
-        self._postprocess_results(evs, T, market_prices, final_state, start_time)
+        self._postprocess_results(evs, T, market_prices, final_state, start_time, granularity)
 
         return self.results
 
@@ -60,21 +62,23 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
     # Local Subproblem
     # -------------------------------------------------------------------------
 
-    def _solve_local_subproblem(self, evs, ev_idx, state, old_state, market_prices, start_time, end_time):
+    def _solve_local_subproblem(self, evs, ev_idx, state, old_state, market_prices, start_time, end_time, T, dt, granularity):
         """
         Builds and solves the local Gurobi subproblem for a single EV
-        under the ADMM penalty for the sum of |u|.
+        under the ADMM penalty for the absolute value of the sum of u.
         """
         ev = evs[ev_idx]
-        alpha = ev["disconnection_time_preference_coefficient"]
-        beta_wear = ev["battery_wear_cost_coefficient"]
+        alpha = ev["disconnection_time_flexibility"]
+        beta = ev["soc_flexibility"]
+        battery_wear = ev["battery_wear_cost_coefficient"]
         eff = ev["energy_efficiency"]
-        T = end_time - start_time
         M = ev["battery_capacity"] + ev["max_charge_rate"] * T
+        start_step = start_time * granularity
+        end_step = end_time * granularity
 
         # ADMM references from iteration_state
-        mu = state["mu"]
-        beta = self.admm_solver.beta
+        dual = state["dual"]
+        nu = self.admm_solver.nu
 
         # Set up a Gurobi model
         model = Model(f"EV_{ev['id']}")
@@ -84,18 +88,23 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         u = model.addVars(T, lb=-ev["max_discharge_rate"], ub=ev["max_charge_rate"], name="u")
         soc = model.addVars(T + 1, lb=0, ub=ev["battery_capacity"], name="soc")
         b = model.addVars(T, vtype=GRB.BINARY, name="b")  # disconnection indicator
-        t_actual = model.addVar(vtype=GRB.INTEGER, lb=start_time + 1, ub=end_time, name="t_actual")
+        t_actual = model.addVar(vtype=GRB.INTEGER, lb= (start_step+1), ub=(end_step), name="t_actual")
         abs_u = model.addVars(T, lb=0, name="abs_u")
         delta = model.addVars(T, vtype=GRB.BINARY, name="delta") # t < t_actual indicator
 
         # Build objective
         operator_cost = 0
         for t in range(T):
-            operator_cost += market_prices[t] * u[t]
-            operator_cost += beta_wear * abs_u[t] * eff
+            hour_idx = t // granularity
+            operator_cost += market_prices[hour_idx] * u[t] * dt
+            operator_cost += battery_wear * abs_u[t] * dt * eff
 
         # Quadratic penalty for disconnection time
-        operator_cost += 0.5 * alpha * (ev["disconnection_time"] - t_actual) ** 2
+        desired_substep = ev["disconnection_time"] * granularity
+        operator_cost += 0.5 * alpha * ((desired_substep - t_actual)/granularity)**2
+
+        # Quadratic penalty for SoC deviation
+        operator_cost += 0.5 * beta * (soc[T] - ev["desired_soc"]) ** 2
 
         # ADMM penalty: we add variables w[t]
         admm_cost = 0
@@ -109,9 +118,9 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             model.addConstr(local_abs[t] >= u[t] + sum_other, name=f"local_abs_pos_{t}")
             model.addConstr(local_abs[t] >= -(u[t] + sum_other), name=f"local_abs_neg_{t}")
 
-            admm_cost += 0.5 / beta * (w[t]*w[t] - mu[t]*mu[t])
+            admm_cost += 0.5 / nu * (w[t]*w[t] - dual[t]*dual[t])
             model.addConstr(
-                w[t] >= mu[t] + beta * (local_abs[t] - self.config["evcs_power_limit"]),
+                w[t] >= dual[t] + nu * (local_abs[t] - self.config["evcs_power_limit"]),
                 name=f"wPos_{t}"
             )
             model.addConstr(w[t] >= 0, name=f"wNonNeg_{t}")
@@ -124,31 +133,26 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
 
         # 2) Exactly one disconnection time, that tracks t_actual
         model.addConstr(sum(b[t] for t in range(T)) == 1, "OneDisconnectionTime")
-        model.addConstr(t_actual == sum((t + start_time + 1) * b[t] for t in range(T)), "tActualLink")
+        model.addConstr(t_actual == sum((t + start_step + 1) * b[t] for t in range(T)), "tActualLink")
 
-        # 3) Desired final SoC constraints
+        # 3) SoC dynamics
         for t in range(T):
-            model.addConstr(soc[t + 1] >= ev["desired_soc"] - (1 - b[t]) * M, f"SoCPos_{t}")
-            model.addConstr(soc[t + 1] <= ev["desired_soc"] + (1 - b[t]) * M, f"SoCNeg_{t}")
+            model.addConstr(soc[t + 1] == soc[t] + dt * u[t] * eff, f"SoCDyn_{t}")
 
-        # 4) SoC dynamics
-        for t in range(T):
-            model.addConstr(soc[t + 1] == soc[t] + u[t] * eff, f"SoCDyn_{t}")
-
-        # 5) abs_u, SoC threshold and charging constraints
+        # 4) abs_u, SoC threshold and charging constraints
         for t in range(T):
             model.addConstr(abs_u[t] >= u[t], f"AbsUPos_{t}")
             model.addConstr(abs_u[t] >= -u[t], f"AbsUNeg_{t}")
 
             # Define delta[t] to indicate if t < t_actual
-            model.addConstr(t_actual - (t + start_time) >= 1 - M * (1 - delta[t]), f"Delta_Definition1_{t}")
-            model.addConstr(t_actual - (t + start_time) <= M * delta[t], f"Delta_Definition2_{t}")
+            model.addConstr(t_actual - (t + start_step) >= 1 - M * (1 - delta[t]), f"Delta_Definition1_{t}")
+            model.addConstr(t_actual - (t + start_step) <= M * delta[t], f"Delta_Definition2_{t}")
 
             # Charging/discharging limits dependent on delta[t]
             model.addConstr(u[t] <= ev["max_charge_rate"] * delta[t], f"MaxChargeRate_{t}")
             model.addConstr(u[t] >= -ev["max_discharge_rate"] * delta[t], f"MinDischargeRate_{t}")
 
-        # 6) Min SoC constraints
+        # 5) Min SoC constraints
         for t in range(T + 1):
             model.addConstr(soc[t] >= ev["min_soc"], f"MinSoC_{t}")
 
@@ -170,7 +174,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         # Store solutions in iteration_state
         state["u"][ev_idx, :] = sol_u
         state["soc"][ev_idx, :] = sol_soc
-        state["t_actual"][ev_idx] = sol_t_actual
+        state["t_actual"][ev_idx] = sol_t_actual/granularity
 
     # -------------------------------------------------------------------------
     # Global Step
@@ -178,20 +182,20 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
 
     def _global_step(self, state, evcs_power_limit):
         """
-        Updates the dual variable 'mu' based on the absolute value of the sum of u_n across all EVs.
+        Updates the dual variable based on the absolute value of the sum of u_n across all EVs.
         """
         sum_u = np.sum(state["u"], axis=0)
-        mu = state["mu"]
-        beta = self.admm_solver.beta
+        dual = state["dual"]
+        nu = self.admm_solver.nu
 
-        new_mu = np.maximum(0, mu + beta * (np.abs(sum_u) - evcs_power_limit))
-        state["mu"] = new_mu
+        new_dual = np.maximum(0, dual + nu * (np.abs(sum_u) - evcs_power_limit))
+        state["dual"] = new_dual
 
     # -------------------------------------------------------------------------
     # Post-processing
     # -------------------------------------------------------------------------
 
-    def _postprocess_results(self, evs, T, market_prices, final_state, start_time):
+    def _postprocess_results(self, evs, T, market_prices, final_state, start_time, granularity):
         """
         Builds aggregator-level cost vectors and SoC tracking from the final ADMM state.
         """
@@ -228,7 +232,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
 
             for i, ev in enumerate(evs):
                 u_it = final_state["u"][i, t]
-                cost_energy = market_prices[t] * u_it
+                cost_energy = market_prices[t//granularity] * u_it
                 cost_wear = (ev["battery_wear_cost_coefficient"] *
                              abs(u_it) *
                              ev["energy_efficiency"])
@@ -265,20 +269,20 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             energy_cost_dict = {}
             adaptability_cost_dict = {}
             congestion_cost_dict = {}
-            mu = final_state["mu"]  # Global dual variable array (length T)
+            dual = final_state["dual"]  # Global dual variable array (length T)
             for i, ev in enumerate(evs):
                 ev_id = ev["id"]
 
                 # Energy cost: sum over t of market_prices[t] * u[i,t]
-                energy_cost_ev = sum(market_prices[t] * final_state["u"][i, t] for t in range(T))
+                energy_cost_ev = sum(market_prices[t//granularity] * final_state["u"][i, t] for t in range(T))
                 energy_cost_dict[ev_id] = energy_cost_ev
 
                 # Adaptability cost: quadratic penalty on disconnect time deviation
-                adaptability_cost_ev = 0.5 * ev["disconnection_time_preference_coefficient"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
+                adaptability_cost_ev = 0.5 * ev["disconnection_time_flexibility"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
                 adaptability_cost_dict[ev_id] = adaptability_cost_ev    
 
                 # Congestion cost: extra cost due to dual variables ("Walras tax")
-                congestion_cost_ev = sum(mu[t] * final_state["u"][i, t] for t in range(T))
+                congestion_cost_ev = sum(dual[t] * final_state["u"][i, t] for t in range(T))
                 congestion_cost_dict[ev_id] = congestion_cost_ev
 
             # Add the new metrics to the results dictionary
@@ -292,10 +296,10 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             cost_i = 0.0
             for t in range(T):
                 # Energy cost and battery wear cost
-                cost_i += market_prices[t] * final_state["u"][i, t] \
+                cost_i += market_prices[t//granularity] * final_state["u"][i, t] \
                         + ev["battery_wear_cost_coefficient"] * abs(final_state["u"][i, t]) * ev["energy_efficiency"]
             # Quadratic penalty on disconnection time deviation
-            cost_i += 0.5 * ev["disconnection_time_preference_coefficient"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
+            cost_i += 0.5 * ev["disconnection_time_flexibility"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
             individual_cost[ev["id"]] = cost_i
 
         # Store the per-EV cost breakdown in the results

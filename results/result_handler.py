@@ -80,9 +80,10 @@ class ResultHandler:
         requested_plots: List[str] = self.config.get("plots", [])
 
         # Set up the time axis
+        granularity = self.config["granularity"]
         start_time, end_time = self.config["time_range"]
-        T = end_time - start_time  # total time steps
-        time_axis = [start_time + t for t in range(T + 1)]
+        T = self.config["T"]
+        time_axis = [start_time + t*self.config["dt"] for t in range(T+1)]
 
         # Mapping from plot_name to the corresponding PlotHandler method
         # Only plots that are actually handled here

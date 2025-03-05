@@ -1,9 +1,9 @@
 # NAME XP
 folder: "tests"
-name_xp: "min_soc_to_initial_soc"
+name_xp: "granularity_centralized"
 
 # EXPERIMENT TYPE
-experiment_types: ["coordinated"]
+experiment_types: ["centralized"]
     # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated" or "centralized"
 
 # NUMBER OF RUNS
@@ -14,6 +14,7 @@ stochastic: true
 time_range: [10, 22]  # Time from 10 AM to 10 PM
 seed: 42
 market_prices: [215.06,162.85,151.21,141.93,134.66,131.39,132.57,138.1,151.38,144.9,223.78,198.09,171.76,168.51,156.74,143.17,146.16] # Jan. 16, in $/MWh, 7 AM to 12 AM
+granularity: 4
 market_prices_csv: "C:/Users/sabri/Projects/v2g_mechanism_project/data/processed/day_ahead_prices/hub_prices.csv"
 evcs_power_limit: 25
 alpha_factor: 1
@@ -32,7 +33,8 @@ evs:
     max_discharge_rate: 7 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.01 # for Nissan Leaf 0.13
-    disconnection_time_preference_coefficient: 0.1 # 5c for delaying by 1h
+    disconnection_time_flexibility: 0.1 # 5c for delaying by 1h
+    soc_flexibility: 10
     energy_efficiency: 0.87
   - id: 1
     disconnection_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
@@ -43,7 +45,8 @@ evs:
     max_discharge_rate: 7 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.01
-    disconnection_time_preference_coefficient: 0.1
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
     energy_efficiency: 0.87
   - id: 2
     disconnection_time: 17 # should be between time_range[0]+1 and time_range[1] (included)
@@ -54,7 +57,8 @@ evs:
     max_discharge_rate: 7 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.01
-    disconnection_time_preference_coefficient: 0.1
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
     energy_efficiency: 0.87
   - id: 3
     disconnection_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
@@ -65,7 +69,8 @@ evs:
     max_discharge_rate: 7 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.01
-    disconnection_time_preference_coefficient: 0.1
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
     energy_efficiency: 0.87
   - id: 4
     disconnection_time: 20 # should be between time_range[0]+1 and time_range[1] (included)
@@ -76,7 +81,8 @@ evs:
     max_discharge_rate: 7 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.01
-    disconnection_time_preference_coefficient: 0.1
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
     energy_efficiency: 0.87
 
 # METRICS/RESULTS
