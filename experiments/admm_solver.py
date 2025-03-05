@@ -13,7 +13,8 @@ class ADMM:
         num_agents: int,
         T: int,
         beta: float = 0.1,
-        max_iter: int = 40,
+        beta_coefficient: float = 1.2,
+        max_iter: int = 100,
         tol: float = 1e-3,
         local_subproblem_fn=None,
         global_step_fn=None
@@ -31,6 +32,7 @@ class ADMM:
         self.num_agents = num_agents
         self.T = T
         self.beta = beta
+        self.beta_coefficient = beta_coefficient
         self.max_iter = max_iter
         self.tol = tol
 
@@ -68,7 +70,6 @@ class ADMM:
 
             # 2) Global step
             self.global_step_fn(self.iteration_state)
-
             self.old_iteration_state = copy(self.iteration_state) # shallow copy
 
             # 3) Convergence check
@@ -81,7 +82,7 @@ class ADMM:
                 logging.info(f"ADMM converged after {iteration} iterations.")
                 break
             else:
-                self.beta *= 1.2  # Increase penalty parameter for better convergence
+                self.beta *= self.beta_coefficient  # Increase penalty parameter for better convergence
 
         if iteration == self.max_iter - 1:
             logging.warning(f"ADMM reached max_iter={self.max_iter} without converging.")

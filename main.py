@@ -8,7 +8,7 @@ from config.config_handler import ConfigHandler
 from experiments.uncoordinated_charging_experiment import UncoordinatedChargingExperiment
 from experiments.coordinated_scheduling_experiment import CoordinatedSchedulingExperiment
 from experiments.unidirectional_coordinated_scheduling_experiment import UnidirectionalCoordinatedSchedulingExperiment
-from experiments.inelastic_coordinated_scheduling_experiment import InelasticCoordinatedSchedulingExperiment
+from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
 
 # Results
 from results.result_handler import ResultHandler
@@ -65,7 +65,7 @@ def main(config_path):
         "uncoordinated": UncoordinatedChargingExperiment,
         "coordinated": CoordinatedSchedulingExperiment,
         "unidirectional_coordinated": UnidirectionalCoordinatedSchedulingExperiment,
-        "inelastic_coordinated": InelasticCoordinatedSchedulingExperiment
+        "centralized": CentralizedSchedulingExperiment,
     }
 
     experiment_types = config.get("experiment_types", [])
@@ -113,4 +113,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     config_file = sys.argv[1]
-    main(config_file)
+    main(config_file)    

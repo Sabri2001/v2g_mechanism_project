@@ -23,9 +23,9 @@ class UncoordinatedChargingExperiment(BaseExperiment):
 
         # Prepare results structure
         results = {
-            "operator_cost_vector": np.zeros(T).tolist(),
-            "energy_cost_vector": np.zeros(T).tolist(),  # Track only the energy component
-            "sum_operator_cost": 0,
+            "operator_cost_over_time": np.zeros(T).tolist(),
+            "energy_cost_over_time": np.zeros(T).tolist(),  # Track only the energy component
+            "sum_operator_costs": 0,
             "sum_energy_costs": 0,
             "soc_over_time": {
                 ev["id"]: [ev["initial_soc"]] + [0] * T for ev in evs
@@ -83,8 +83,8 @@ class UncoordinatedChargingExperiment(BaseExperiment):
                 wear_cost = beta * abs(usable_energy)  # Could be more sophisticated
 
                 # Update result vectors
-                results["operator_cost_vector"][t] += (energy_cost + wear_cost)
-                results["energy_cost_vector"][t] += energy_cost
+                results["operator_cost_over_time"][t] += (energy_cost + wear_cost)
+                results["energy_cost_over_time"][t] += energy_cost
 
             else:
                 # If the for-loop completes without a break, we fill the remainder with current SoC
@@ -92,8 +92,8 @@ class UncoordinatedChargingExperiment(BaseExperiment):
                     results["soc_over_time"][ev_id][t_remaining] = soc
 
         # Aggregate final costs
-        results["sum_operator_cost"] = sum(results["operator_cost_vector"])
-        results["sum_energy_costs"] = sum(results["energy_cost_vector"])
+        results["sum_operator_costs"] = sum(results["operator_cost_over_time"])
+        results["sum_energy_costs"] = sum(results["energy_cost_over_time"])
 
         # For consistency with other experiments, set these fields even if uncoordinated
         results["desired_disconnection_time"] = [ev["disconnection_time"] for ev in evs]

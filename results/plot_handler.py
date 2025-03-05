@@ -2,6 +2,7 @@ import logging
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+from matplotlib.patches import Rectangle
 
 
 class PlotHandler:
@@ -10,8 +11,8 @@ class PlotHandler:
         sns.set(style="whitegrid")
         fig, ax1 = plt.subplots(figsize=(12, 6))
 
-        operator_cost = results["operator_cost_vector"]
-        energy_costs = results["energy_cost_vector"]
+        operator_cost = results["operator_cost_over_time"]
+        energy_costs = results["energy_cost_over_time"]
         # Remove the last value of time axis to make the vectors the same length
         time_axis = time_axis[:-1]
 
@@ -148,32 +149,6 @@ class PlotHandler:
         logging.info(f"Plot 'market_prices' saved to {output_path}")
 
     @staticmethod
-    def plot_evcs_power(evcs_power, time_axis, output_path):
-        """
-        Plot the cumulative sum of absolute energy discharged in the EVCS against time.
-
-        Args:
-            evcs_power (list): List of cumulative sum of |u_i,t| for each time slot t.
-            time_axis (list): List of time slots.
-            output_path (str): Path to save the output plot.
-        """
-        sns.set(style="whitegrid")
-        plt.figure(figsize=(12, 6))
-
-        plt.plot(time_axis, evcs_power, marker='o', linestyle='-', color='tab:green')
-
-        plt.title("Cumulative Sum of Absolute Energy Discharged in EVCS Over Time", fontsize=14)
-        plt.xlabel("Time (hours)", fontsize=12)
-        plt.ylabel("Cumulative Discharged Energy (kWh)", fontsize=12)
-        plt.xticks(time_axis)
-        plt.grid(True, linestyle='--', linewidth=0.5)
-
-        plt.tight_layout()
-        plt.savefig(output_path)
-        plt.close()
-        logging.info(f"Plot 'evcs_power' saved to {output_path}")
-
-    @staticmethod
     def plot_summary_bars(results_by_experiment, output_path):
         """
         Plot a bar chart summarizing the operator costs and energy costs
@@ -194,7 +169,7 @@ class PlotHandler:
 
         for xp_type in experiment_types:
             xp_results = results_by_experiment[xp_type]
-            operator_cost = [res["sum_operator_cost"] for res in xp_results]
+            operator_cost = [res["sum_operator_costs"] for res in xp_results]
             energy_cost = [res["sum_energy_costs"] for res in xp_results]
 
             # Calculate means and 95% CI
@@ -390,3 +365,99 @@ class PlotHandler:
         plt.savefig(output_path, bbox_inches='tight')
         plt.close()
         logging.info(f"Plot 'v2g_fraction_bars' saved to {output_path}")
+    
+    @staticmethod
+    def plot_payment_comparison(results, time_axis, output_path):
+        """
+        Plots a bar chart comparing the congestion_cost and vcg_tax for each EV.
+        The x-axis corresponds to the EV IDs, and for each EV two bars are drawn:
+        one for congestion_cost and one for vcg_tax.
+        This plot is only generated if both 'congestion_cost' and 'vcg_tax' are available in results.
+        """
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        sns.set(style="whitegrid")
+        
+        # Check if both congestion_cost and vcg_tax are available in results
+        if "congestion_cost" not in results or "vcg_tax" not in results:
+            plt.figure()
+            plt.text(0.5, 0.5, "No payment data available", ha='center', va='center')
+            plt.savefig(output_path)
+            plt.close()
+            import logging
+            logging.warning("Payment comparison plot skipped because 'congestion_cost' or 'vcg_tax' not found in results.")
+            return
+
+        # Both keys exist: extract the dictionaries.
+        congestion_cost = results["congestion_cost"]
+        vcg_tax = results["vcg_tax"]
+        
+        # Determine the EV IDs that appear in both dictionaries.
+        ev_ids = sorted(set(congestion_cost.keys()) & set(vcg_tax.keys()))
+        if not ev_ids:
+            import logging
+            logging.warning("No matching EV ids found in congestion_cost and vcg_tax; skipping payment_comparison plot.")
+            return
+
+        # Prepare the data for plotting.
+        congestion_values = [congestion_cost[ev] for ev in ev_ids]
+        vcg_values = [vcg_tax[ev] for ev in ev_ids]
+
+        x = np.arange(len(ev_ids))  # positions for EV groups
+        width = 0.35  # width of the bars
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        rects1 = ax.bar(x - width/2, congestion_values, width, label='Congestion Cost', color='tab:blue')
+        rects2 = ax.bar(x + width/2, vcg_values, width, label='VCG Tax', color='tab:orange')
+
+        # Labeling
+        ax.set_xlabel("EV id")
+        ax.set_ylabel("Payment")
+        ax.set_title("Payment Comparison: Congestion Cost vs. VCG Tax per EV")
+        ax.set_xticks(x)
+        ax.set_xticklabels(ev_ids)
+        ax.legend()
+
+        fig.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        import logging
+        logging.info(f"Plot 'payment_comparison' saved to {output_path}")
+
+    @staticmethod
+    def plot_nash_grid(tau_values, alpha_values, cost_grid, output_path, true_tau=None, true_alpha=None):
+        """
+        Plot a heatmap (grid) of the target EV's utility as a function of its bid parameters.
+        - tau_values (x-axis): candidate disconnection_time bids.
+        - alpha_values (y-axis): candidate disconnection_time_preference_coefficient bids.
+        - cost_grid: a 2D array (shape: len(alpha_values) x len(tau_values))
+          where each cell is the EV's utility computed as energy_cost + congestion_cost + adaptability_cost.
+        - If true_tau and true_alpha are provided, the cell matching these values is highlighted with a thick yellow border.
+        The colormap runs from green (low cost) to red (high cost).
+        """
+        sns.set(style="whitegrid")
+        plt.figure(figsize=(8, 6))
+        # Use the reversed RdYlGn colormap so that low values are green and high values are red.
+        cmap = "RdYlGn_r"
+        ax = sns.heatmap(cost_grid, xticklabels=tau_values, yticklabels=alpha_values, cmap=cmap, annot=True, fmt=".2f")
+        plt.xlabel("Bid: disconnection time")
+        plt.ylabel("Bid: adaptability coefficient)")
+        plt.title("Cost of Target EV as a Function of its Bid")
+        
+        # If true_tau and true_alpha are provided, highlight that cell.
+        if true_tau is not None and true_alpha is not None:
+            try:
+                col_index = tau_values.index(true_tau)
+                row_index = alpha_values.index(true_alpha)
+                # The heatmap's coordinate system: each cell is 1 unit. Add a Rectangle patch.
+                rect = Rectangle((col_index, row_index), 1, 1, fill=False, edgecolor='blue', lw=3)
+                ax.add_patch(rect)
+            except ValueError:
+                logging.warning("True bid values not found in the candidate lists; skipping cell highlight.")
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Plot 'nash_grid' saved to {output_path}")

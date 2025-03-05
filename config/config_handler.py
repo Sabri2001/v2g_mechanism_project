@@ -183,7 +183,7 @@ class ConfigHandler:
         # If not stochastic, these fields are also required
         if not self.config["stochastic"]:
             required_ev_fields += [
-                "disconnect_time", "disconnection_time_preference_coefficient",
+                "disconnection_time", "disconnection_time_preference_coefficient",
                 "initial_soc", "desired_soc"
             ]
 
@@ -235,7 +235,8 @@ class ConfigHandler:
         df = pd.read_csv(market_prices_csv)
 
         start_time, end_time = time_range
-        time_columns = [str(hour) for hour in range(start_time, end_time)]
+        # Format hours as two-digit strings (e.g., "01", "02", ...)
+        time_columns = [f"{hour:02d}" for hour in range(start_time, end_time)]
         required_columns = ["Date"] + time_columns
 
         # Ensure CSV has the columns
@@ -289,7 +290,7 @@ class ConfigHandler:
             # Clamp to valid time range
             ev_copy["disconnect_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
 
-            # 3) Sample (initial_soc, desired_soc)
+            # 3) Sample (initial_soc, desired_soc) and min_soc
             ev_copy = self._sample_soc(ev_copy)
 
             sampled_evs.append(ev_copy)
@@ -315,6 +316,7 @@ class ConfigHandler:
 
             if desired_soc > init_soc:
                 ev_copy["initial_soc"] = init_soc
+                ev_copy["min_soc"] = init_soc
                 ev_copy["desired_soc"] = desired_soc
                 return ev_copy
 
@@ -326,7 +328,7 @@ class ConfigHandler:
             "run_id": 1,
             "sampled_day_data": {
                 "date": None,
-                "prices": self.config["market_prices"]
+                "prices": [price * 0.001 for price in self.config["market_prices"]] # Convert from $/MWh to $/kWh
             },
             "evs": self.config["evs"]
         })

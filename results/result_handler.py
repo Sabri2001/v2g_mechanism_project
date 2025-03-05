@@ -90,7 +90,7 @@ class ResultHandler:
             "total_cost_vs_energy_cost": PlotHandler.plot_total_cost_vs_energy_cost,
             "soc_evolution": PlotHandler.plot_soc_evolution,
             "market_prices": PlotHandler.plot_market_prices,
-            "evcs_power": PlotHandler.plot_evcs_power,
+            "payment_comparison": PlotHandler.plot_payment_comparison,
         }
 
         # Loop over all plot_methods, only generate plots if they are requested
@@ -114,17 +114,6 @@ class ResultHandler:
             elif plot_name == "soc_evolution":
                 # This plot function requires `results`, `time_axis`, `config`, and `output_path`.
                 plot_method(self.results, time_axis, output_path, self.config)
-
-            elif plot_name == "evcs_power":
-                # Check if 'evcs_power' data is available in results
-                evcs_power_data = self.results.get("evcs_power")
-                if evcs_power_data is not None:
-                    # time_axis[:-1] might be used if evcs_power has length T
-                    plot_method(evcs_power_data, time_axis[:-1], output_path)
-                else:
-                    logging.warning(
-                        "No 'evcs_power' found in results. Skipping evcs_power plot."
-                    )
 
             else:
                 # For all other plot types in plot_methods,

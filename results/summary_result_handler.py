@@ -85,7 +85,7 @@ class SummaryResultHandler:
         if "total_cost_benchmarking" in plots:
             if "uncoordinated" not in self.experiment_types:
                 logging.warning(
-                    "Cannot generate percentage change plot because "
+                    "Cannot generate total cost benchmarking plot because "
                     "'uncoordinated' is not present in experiment types."
                 )
             else:
