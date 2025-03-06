@@ -32,7 +32,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         iteration_state = {
             "u": np.zeros((len(evs), T)),
             "soc": np.zeros((len(evs), T + 1)),
-            "t_actual": np.zeros(len(evs), dtype=int),
+            "t_actual": np.zeros(len(evs), dtype=float),
             "dual": np.zeros(T),  # dual variable for the global constraint
         }
 
@@ -163,7 +163,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             # Retrieve solutions
             sol_u = np.array([u[t].X for t in range(T)])
             sol_soc = np.array([soc[t].X for t in range(T+1)])
-            sol_t_actual = int(round(t_actual.X))
+            sol_t_actual = t_actual.X
         else:
             logging.warning(f"EV {ev['id']} subproblem not optimal, status {model.status}")
             # fallback to old iteration values
@@ -213,7 +213,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         # 1) SoC results + disconnection times
         for i, ev in enumerate(evs):
             desired_disconnection_time.append(ev["disconnection_time"])
-            actual_disconnection_time.append(int(final_state["t_actual"][i]))
+            actual_disconnection_time.append(final_state["t_actual"][i])
 
             # SoC
             for t in range(T+1):

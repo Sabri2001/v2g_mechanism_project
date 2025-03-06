@@ -92,7 +92,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             
             # Link t_actual with disconnection indicator
             model.addConstr(
-                ev_vars["t_actual"] == gp.quicksum((start_step + t+ 1) * ev_vars["b"][t] for t in range(T_ev)),
+                ev_vars["t_actual"] == gp.quicksum((start_step + t + 1) * ev_vars["b"][t] for t in range(T_ev)),
                 name=f"t_actual_link_{ev_id}"
             )
             
@@ -160,7 +160,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
                            + battery_wear * ev_vars["abs_u"][t] * dt * eff
             # Quadratic penalty on disconnection time deviation
             desired_step = desired_disc_time * granularity
-            cost_ev += 0.5 * alpha * ((desired_step - ev_vars["t_actual"]) * (desired_step - ev_vars["t_actual"]))
+            cost_ev += 0.5 * alpha * ((desired_step - ev_vars["t_actual"]) * (desired_step - ev_vars["t_actual"]))/granularity / granularity
             # Quadratic penalty on soc deviation
             cost_ev += 0.5 * beta * ((desired_soc - ev_vars["soc"][T]) * (desired_soc - ev_vars["soc"][T]))
             total_cost += cost_ev

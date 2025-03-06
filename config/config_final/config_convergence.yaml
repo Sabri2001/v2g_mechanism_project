@@ -1,0 +1,221 @@
+# NAME XP
+folder: "convergence"
+name_xp: "test_15"
+
+# EXPERIMENT TYPE
+experiment_types: ["coordinated"]
+    # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated" or "centralized"
+
+# NUMBER OF RUNS
+num_runs: 1
+
+# SIMULATION PARAMETERS
+stochastic: true
+time_range: [10, 22]  # From 10 AM to 10 PM
+seed: 42
+market_prices: [215.06,162.85,151.21,141.93,134.66,131.39,132.57,138.1,151.38,144.9,223.78,198.09,171.76,168.51,156.74,143.17,146.16] # Jan. 16, in $/MWh, 7 AM to 12 AM
+granularity: 4
+market_prices_csv: "C:/Users/sabri/Projects/v2g_mechanism_project/data/processed/day_ahead_prices/hub_prices.csv"
+evcs_power_limit: 75 # in kW
+alpha_factor: 1
+price_factor: 1
+alpha_model_path: "models/gmm_alpha.pkl"
+disconnection_model_path: "models/gmm_disconnection_model.pkl"
+soc_model_path: "models/initial_final_soc_kde.pkl"
+
+evs:
+  - id: 0
+    disconnection_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
+    battery_capacity: 40 # in kWh, for Nissan Leaf
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5 # Wallbox Quasar 2
+    max_discharge_rate: 7 # Nissan leaf limit
+    min_soc: 15 # equal to initial_soc
+    battery_wear_cost_coefficient: 0.01 # for Nissan Leaf 0.13
+    disconnection_time_flexibility: 0.1 # 5c for delaying by 1h
+    soc_flexibility: 10 # quite strict, to be changed?
+    energy_efficiency: 0.87 # Nissan Leaf
+  - id: 1
+    disconnection_time: 17
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 2
+    disconnection_time: 17
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5 
+    max_discharge_rate: 7 
+    min_soc: 15 
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 3
+    disconnection_time: 18
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 4
+    disconnection_time: 20
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+    evs:
+  - id: 5
+    disconnection_time: 18
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 6
+    disconnection_time: 17
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 7
+    disconnection_time: 17
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 8
+    disconnection_time: 18
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 9
+    disconnection_time: 20
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+    evs:
+  - id: 10
+    disconnection_time: 18
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 11
+    disconnection_time: 17
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 12
+    disconnection_time: 17
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 13
+    disconnection_time: 18
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 14
+    disconnection_time: 20
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 11.5
+    max_discharge_rate: 7
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.01
+    disconnection_time_flexibility: 0.1
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+
+# METRICS/RESULTS
+# walras_tax: true
+# vcg: true
+
+plots:
+  - total_cost_vs_energy_cost
+  - soc_evolution
+  - market_prices
+  - total_cost_bars
+  # - payment_comparison
+  # - total_cost_benchmarking
+  - v2g_fraction

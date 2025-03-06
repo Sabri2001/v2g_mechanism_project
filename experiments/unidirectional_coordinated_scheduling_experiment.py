@@ -32,7 +32,7 @@ class UnidirectionalCoordinatedSchedulingExperiment(BaseExperiment):
         iteration_state = {
             "u": np.zeros((len(evs), T)),
             "soc": np.zeros((len(evs), T + 1)),
-            "t_actual": np.zeros(len(evs), dtype=int),
+            "t_actual": np.zeros(len(evs), dtype=float),
             "dual": np.zeros(T),  # dual variable for the global constraint
         }
 
@@ -203,7 +203,7 @@ class UnidirectionalCoordinatedSchedulingExperiment(BaseExperiment):
         # 1) SoC results + disconnection times
         for i, ev in enumerate(evs):
             desired_disconnection_time.append(ev["disconnection_time"])
-            actual_disconnection_time.append(int(final_state["t_actual"][i]))
+            actual_disconnection_time.append(final_state["t_actual"][i])
 
             # SoC
             for t in range(T+1):

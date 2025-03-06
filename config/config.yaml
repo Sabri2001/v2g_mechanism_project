@@ -1,17 +1,17 @@
 # NAME XP
 folder: "tests"
-name_xp: "granularity_centralized"
+name_xp: "hour_ticks"
 
 # EXPERIMENT TYPE
-experiment_types: ["centralized"]
+experiment_types: ["coordinated"]
     # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated" or "centralized"
 
 # NUMBER OF RUNS
 num_runs: 1
 
 # SIMULATION PARAMETERS
-stochastic: true
-time_range: [10, 22]  # Time from 10 AM to 10 PM
+stochastic: false
+time_range: [7, 24]  # Time from 10 AM to 10 PM
 seed: 42
 market_prices: [215.06,162.85,151.21,141.93,134.66,131.39,132.57,138.1,151.38,144.9,223.78,198.09,171.76,168.51,156.74,143.17,146.16] # Jan. 16, in $/MWh, 7 AM to 12 AM
 granularity: 4

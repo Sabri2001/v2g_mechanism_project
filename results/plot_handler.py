@@ -1,6 +1,7 @@
 import logging
 import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.ticker as ticker
 import seaborn as sns
 from matplotlib.patches import Rectangle
 
@@ -85,7 +86,11 @@ class PlotHandler:
 
         # Shared x-axis labels
         plt.xlabel("Time", fontsize=12)
-        plt.xticks(time_axis, labels=[f"{t:.1f}" for t in time_axis])
+        for ax in axes:
+            # Set the major locator to every 1 hour
+            ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+            # Format the tick label as, for example, "0:00", "1:00", "2:00", etc.
+            ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{int(x)}:00"))
 
         # Add a single colorbar
         cbar = fig.colorbar(
