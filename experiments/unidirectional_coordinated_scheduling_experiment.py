@@ -103,7 +103,9 @@ class UnidirectionalCoordinatedSchedulingExperiment(BaseExperiment):
         operator_cost += 0.5 * alpha * ((desired_substep - t_actual)/granularity)**2
 
         # Quadratic penalty for SoC deviation
-        operator_cost += 0.5 * beta * (soc[T] - ev["desired_soc"]) ** 2
+        delta_soc = model.addVar(lb=0, name="delta_soc")
+        model.addConstr(delta_soc >= ev["desired_soc"] - soc[T], "delta_soc_constraint")
+        operator_cost += 0.5 * beta * delta_soc * delta_soc
 
         # ADMM penalty: we add variables w[t]
         admm_cost = 0

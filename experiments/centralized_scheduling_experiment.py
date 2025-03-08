@@ -162,7 +162,9 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             desired_step = desired_disc_time * granularity
             cost_ev += 0.5 * alpha * ((desired_step - ev_vars["t_actual"]) * (desired_step - ev_vars["t_actual"]))/granularity / granularity
             # Quadratic penalty on soc deviation
-            cost_ev += 0.5 * beta * ((desired_soc - ev_vars["soc"][T]) * (desired_soc - ev_vars["soc"][T]))
+            delta_soc = model.addVar(lb=0, name=f"delta_soc_{ev_id}")
+            model.addConstr(delta_soc >= desired_soc - ev_vars["soc"][T], name=f"delta_soc_constraint_{ev_id}")
+            cost_ev += 0.5 * beta * delta_soc * delta_soc
             total_cost += cost_ev
         
         model.setObjective(total_cost, GRB.MINIMIZE)
