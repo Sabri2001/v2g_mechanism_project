@@ -40,29 +40,27 @@ class PlotHandler:
         ev_ids = list(schedule_results["soc_over_time"].keys())
         num_evs = len(ev_ids)
 
-        # Create the figure and subplots for each EV
         fig, axes = plt.subplots(
-            num_evs, 1, figsize=(14, 1.5 * num_evs), sharex=True, gridspec_kw={'hspace': 0.7}
+            num_evs, 1, figsize=(14, 1.5 * num_evs), sharex=True,
+            gridspec_kw={'hspace': 0.7}
         )
         if num_evs == 1:
-            axes = [axes]  # Ensure axes is iterable when there is only one EV
+            axes = [axes]
 
         for ax, ev_id in zip(axes, ev_ids):
-            # Get the EV-specific configuration
+            # Fetch EV config and normalize SoC
             ev = next(ev for ev in ev_config["evs"] if ev["id"] == ev_id)
             battery_capacity = ev["battery_capacity"]
             min_soc = 0
-
-            # Normalize SoC
             raw_soc = np.array(schedule_results["soc_over_time"][ev_id])
-            if battery_capacity != min_soc:
-                normalized_soc = (raw_soc - min_soc) / (battery_capacity - min_soc)
-            else:
-                normalized_soc = np.zeros_like(raw_soc)
+            normalized_soc = (
+                (raw_soc - min_soc) / (battery_capacity - min_soc)
+                if battery_capacity != min_soc else np.zeros_like(raw_soc)
+            )
 
-            # Plot using imshow with interpolation
+            # Plot SoC as an image
             ax.imshow(
-                [normalized_soc],  # Data is a 2D array with one row
+                [normalized_soc],
                 aspect='auto',
                 cmap='RdYlGn',
                 vmin=0,
@@ -72,49 +70,61 @@ class PlotHandler:
                 origin='lower'
             )
 
-            # Add lines for desired and actual disconnect times
+            # Desired / actual disconnection lines
             desired_time = schedule_results["desired_disconnection_time"][ev_id]
             actual_time = schedule_results["actual_disconnection_time"][ev_id]
+            ax.axvline(desired_time, color='magenta', linewidth=4, linestyle='-',
+                    label='Desired Disconnection')
+            ax.axvline(actual_time, color='darkblue', linewidth=4, linestyle='-',
+                    label='Actual Disconnection')
 
-            ax.axvline(desired_time, color='magenta', linewidth=4, linestyle='-', label='Desired Disconnect')
-            ax.axvline(actual_time, color='darkblue', linewidth=4, linestyle='-', label='Actual Disconnect')
-
-            # Customize the subplot
+            # Hide y‐axis ticks and label each row with EV ID
             ax.set_yticks([])
-            ax.set_ylabel(str(ev_id), rotation=0, labelpad=15, fontsize=10, ha='center', va='center')
+            ax.set_ylabel(str(ev_id), rotation=0, labelpad=15, fontsize=12,
+                        ha='center', va='center')
             ax.set_xlim(time_axis[0], time_axis[-1])
 
-        # Shared x-axis labels
-        plt.xlabel("Time", fontsize=12)
+        # Label the shared x axis
+        plt.xlabel("Time", fontsize=14, labelpad=25)
         for ax in axes:
-            # Set the major locator to every 1 hour
             ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-            # Format the tick label as, for example, "0:00", "1:00", "2:00", etc.
-            ax.xaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: f"{int(x)}:00"))
+            ax.xaxis.set_major_formatter(
+                ticker.FuncFormatter(lambda x, pos: f"{int(x)}:00")
+            )
 
-        # Add a single colorbar
+        # Adjust layout to leave room on the right for the colorbar,
+        # and some space at the bottom for the legend
+        fig.subplots_adjust(left=0.12,
+                            right=0.84,
+                            bottom=0.15,
+                            top=0.95)
+
+        # Colorbar on the right
         cbar = fig.colorbar(
             plt.cm.ScalarMappable(cmap='RdYlGn', norm=plt.Normalize(0, 1)),
             ax=axes,
             orientation='vertical',
             fraction=0.03,
-            pad=0.1
+            pad=0.07,
+            shrink=0.8
         )
-        cbar.set_label('Normalized State of Charge (SoC)', fontsize=12)
+        cbar.set_label('State of Charge (%)', fontsize=10)
         cbar.set_ticks([0, 1])
         cbar.set_ticklabels(['0 %', '100 %'])
 
-        # Add a vertical "EVs" label on the left
-        fig.text(0.04, 0.5, 'EVs', va='center', rotation='vertical', fontsize=12)
+        # EVs label slightly further from plots (tweak x position)
+        fig.text(0.05, 0.55, 'EVs', va='center', rotation='vertical', fontsize=14)
 
-        # Add a title
-        fig.suptitle("State of Charge (SoC) Evolution Over Time (Normalized)", fontsize=14, y=1.02)
-
-        # Add a legend
+        # Retrieve the line handles for desired/actual and place legend below
         handles, labels = axes[0].get_legend_handles_labels()
-        fig.legend(handles, labels, loc='upper right', fontsize=10)
+        fig.legend(
+            handles, labels,
+            loc='lower center',
+            bbox_to_anchor=(0.45, -0.05),
+            ncol=2,
+            fontsize=10
+        )
 
-        # Save the plot
         plt.savefig(output_path, bbox_inches='tight')
         plt.close()
         logging.info(f"Plot 'soc_evolution' saved to {output_path}")
@@ -154,7 +164,7 @@ class PlotHandler:
         logging.info(f"Plot 'market_prices' saved to {output_path}")
 
     @staticmethod
-    def plot_summary_bars(results_by_experiment, output_path):
+    def plot_total_cost_and_energy(results_by_experiment, output_path):
         """
         Plot a bar chart summarizing the operator costs and energy costs
         for each experiment type with 95% confidence intervals.
@@ -205,6 +215,99 @@ class PlotHandler:
         plt.savefig(output_path)
         plt.close()
         logging.info(f"Plot 'summary_bars' saved to {output_path}")
+
+    @staticmethod
+    def plot_total_cost(results_by_experiment, output_path):
+        """
+        Plot a bar chart summarizing the total operator costs
+        for each experiment type with 95% confidence intervals.
+
+        Args:
+            results_by_experiment (dict): Dictionary where keys are experiment types,
+                                        and values are lists of results for all runs.
+            output_path (str): Path to save the output plot.
+        """
+        sns.set(style="whitegrid")
+
+        experiment_types = list(results_by_experiment.keys())
+        operator_costs = []
+        ci_operator_costs = []
+
+        for xp_type in experiment_types:
+            xp_results = results_by_experiment[xp_type]
+            operator_cost = [res["sum_operator_costs"] for res in xp_results]
+
+            # Calculate mean and 95% CI for operator costs
+            operator_costs.append(np.mean(operator_cost))
+            ci_operator_costs.append(1.96 * np.std(operator_cost) / np.sqrt(len(operator_cost)))
+
+        # Bar positions
+        x = np.arange(len(experiment_types))
+        width = 0.5  # Adjusted bar width since only one bar is plotted per experiment type
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.bar(x, operator_costs, width, label="Total Costs",
+            color="blue", yerr=ci_operator_costs, capsize=5)
+
+        # Add labels, title, and legend
+        ax.set_xlabel("Experiment Type", fontsize=12)
+        ax.set_ylabel("Value ($)", fontsize=12)
+        # ax.set_title("Summary of Operator Costs", fontsize=14)
+        ax.set_xticks(x)
+        ax.set_xticklabels(['ADMM', 'Optimal'], fontsize=10)
+        ax.legend(fontsize=10)
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Plot 'summary_bars' saved to {output_path}")
+
+    @staticmethod
+    def plot_gap_violin(results_by_experiment, output_path):
+        """
+        Compute the percentage gap between ADMM and Optimal solutions,
+        and display it as a violin plot across all experiment runs.
+
+        Assumes:
+            results_by_experiment = {
+                "coordinated":    [ { "sum_operator_costs": ... }, ... ],
+                "centralized": [ { "sum_operator_costs": ... }, ... ]
+            }
+
+        Args:
+            results_by_experiment (dict): Dict of lists of run results.
+            output_path (str): Path to save the output plot.
+        """
+        sns.set(style="whitegrid")
+
+        # Extract costs
+        admm_costs = [run["sum_operator_costs"] for run in results_by_experiment["coordinated"]]
+        opt_costs  = [run["sum_operator_costs"] for run in results_by_experiment["centralized"]]
+
+        # Compute gap for each run: Gap (%) = 100 * (ADMM - Optimal) / Optimal
+        gaps = []
+        for i in range(len(admm_costs)):
+            if opt_costs[i] == 0:
+                # Safety check in case Optimal = 0
+                gaps.append(0.0)
+            else:
+                gap = 100.0 * (admm_costs[i] - opt_costs[i]) / opt_costs[i]
+                gaps.append(gap)
+
+        # Create a violin plot of the gaps
+        fig, ax = plt.subplots(figsize=(8, 5))
+        sns.violinplot(x=gaps, ax=ax, orient='h', cut=0)
+
+        # Optional line to show 0% gap reference
+        ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
+
+        ax.set_xlabel("Gap (%)", fontsize=12)
+        ax.set_title("Violin Plot: ADMM vs. Optimal Gap Distribution", fontsize=14)
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Violin plot of gaps saved to {output_path}")
 
     @staticmethod
     def plot_cost_benchmarking_bars(results_by_experiment, output_path):

@@ -49,11 +49,15 @@ class ConfigHandler:
         self._init_random_state()
 
         # Read alpha_factor, price_factor, and possibly override name_xp from the config
-        self.alpha_factor = self.config.get("alpha_factor", 1)
-        self.price_factor = self.config.get("price_factor", 1)
+        self.alpha_factor = self.config.get("alpha_factor", 1.0)
+        self.price_factor = self.config.get("price_factor", 1.0)
+        
+        self.battery_factor = self.config.get("battery_factor", 1.0)
+        for ev in self.config["evs"]:
+            ev["battery_wear_cost_coefficient"] = round(ev["battery_wear_cost_coefficient"]*self.battery_factor,2)
 
         if "granularity" not in self.config:
-            self.config["granularity"] = 1
+            self.config["granularity"] = 1.0
 
         # Load models
         self._load_alpha_model(self.config["alpha_model_path"])
@@ -162,8 +166,6 @@ class ConfigHandler:
         # alpha_factor & price_factor must be numeric
         if "alpha_factor" not in self.config or not isinstance(self.config["alpha_factor"], (int, float)):
             raise ValueError("alpha_factor must be provided as a numeric value when stochastic is true.")
-        if "price_factor" not in self.config or not isinstance(self.config["price_factor"], (int, float)):
-            raise ValueError("price_factor must be provided as a numeric value when stochastic is true.")
 
     def _validate_non_stochastic_config(self):
         """Validates fields required only when `stochastic=False`."""
@@ -279,7 +281,7 @@ class ConfigHandler:
             alpha_mean = alpha_means[alpha_idx][0]
             alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])  # 1D
             sampled_alpha = self.random_state.normal(loc=alpha_mean, scale=alpha_std)
-            ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor)
+            ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor, 3)
 
             # 2) Sample disconnect_time
             disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)

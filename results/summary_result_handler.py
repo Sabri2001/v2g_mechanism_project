@@ -75,13 +75,26 @@ class SummaryResultHandler:
         Args:
             plots (List[str]): List of requested plot identifiers, e.g. ["total_cost_bars", "v2g_fraction"].
         """
-        # total_cost_bars
+        if "gap_violin" in plots:
+            output_path = os.path.join(self.base_output_dir, "gap_violin.png")
+            PlotHandler.plot_gap_violin(self.results_by_experiment, output_path)
+            logging.info(f"Gap violin saved to {output_path}") 
+
+        if "gap_swarm" in plots:
+            output_path = os.path.join(self.base_output_dir, "gap_swarm.png")
+            PlotHandler.plot_gap_swarm(self.results_by_experiment, output_path)
+            logging.info(f"Gap swarm saved to {output_path}") 
+        
         if "total_cost_bars" in plots:
             output_path = os.path.join(self.base_output_dir, "total_cost_bars.png")
-            PlotHandler.plot_summary_bars(self.results_by_experiment, output_path)
+            PlotHandler.plot_total_cost(self.results_by_experiment, output_path)
             logging.info(f"Total cost bars plot saved to {output_path}")
 
-        # total_cost_benchmarking
+        if "total_cost_and_energy_bars" in plots:
+            output_path = os.path.join(self.base_output_dir, "total_cost_bars.png")
+            PlotHandler.plot_total_cost_and_energy(self.results_by_experiment, output_path)
+            logging.info(f"Total cost bars plot saved to {output_path}")
+
         if "total_cost_benchmarking" in plots:
             if "uncoordinated" not in self.experiment_types:
                 logging.warning(
@@ -93,7 +106,6 @@ class SummaryResultHandler:
                 PlotHandler.plot_cost_benchmarking_bars(self.results_by_experiment, output_path)
                 logging.info(f"Percentage change plot saved to {output_path}")
 
-        # v2g_fraction
         if "v2g_fraction" in plots:
             output_path = os.path.join(self.base_output_dir, "v2g_fraction.png")
             PlotHandler.plot_v2g_fraction_bars(self.results_by_experiment, output_path)

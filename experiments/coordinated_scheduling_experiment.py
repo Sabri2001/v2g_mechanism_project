@@ -28,6 +28,10 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         market_prices = self.config["market_prices"]
         evcs_power_limit = self.config["evcs_power_limit"]
 
+        nu = self.config["nu"]
+        nu_multiplier = self.config["nu_multiplier"]
+        max_iter = self.config["max_iter"]
+
         # 2) Prepare iteration_state for ADMM
         iteration_state = {
             "u": np.zeros((len(evs), T)),
@@ -40,9 +44,9 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         self.admm_solver = ADMM(
             num_agents=len(evs),
             T=T,
-            nu=0.1,
-            nu_multiplier=1,
-            max_iter=100,
+            nu=nu,
+            nu_multiplier=nu_multiplier,
+            max_iter=max_iter,
             tol=1e-3,
             local_subproblem_fn=lambda ev_idx, st, old_st: self._solve_local_subproblem(evs, ev_idx, st, old_st, market_prices, start_time, end_time, T, dt, granularity),
             global_step_fn=lambda st: self._global_step(st, evcs_power_limit)

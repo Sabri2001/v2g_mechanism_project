@@ -75,7 +75,7 @@ class ADMM:
 
             # 3) Convergence check
             new_dual = self._snapshot_of_duals()
-            logging.debug(f"new_dual: {new_dual}")
+            logging.debug(f"new_dual: {new_dual[:5]}")
             dual_diff = self._compute_dual_diff(old_dual, new_dual)
             logging.debug(f"Dual difference: {dual_diff}")
 
