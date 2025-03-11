@@ -541,8 +541,8 @@ class PlotHandler:
         - tau_values (x-axis): candidate disconnection_time bids.
         - alpha_values (y-axis): candidate disconnection_time_flexibility bids.
         - cost_grid: a 2D array (shape: len(alpha_values) x len(tau_values))
-          where each cell is the EV's utility computed as energy_cost + congestion_cost + adaptability_cost.
-        - If true_tau and true_alpha are provided, the cell matching these values is highlighted with a thick yellow border.
+        where each cell is the EV's utility computed as energy_cost + congestion_cost + adaptability_cost.
+        - If true_tau and true_alpha are provided, the cell matching these values is highlighted with a thick blue border.
         The colormap runs from green (low cost) to red (high cost).
         """
         sns.set(style="whitegrid")
@@ -550,9 +550,9 @@ class PlotHandler:
         # Use the reversed RdYlGn colormap so that low values are green and high values are red.
         cmap = "RdYlGn_r"
         ax = sns.heatmap(cost_grid, xticklabels=tau_values, yticklabels=alpha_values, cmap=cmap, annot=True, fmt=".2f")
-        plt.xlabel("Bid: disconnection time")
-        plt.ylabel("Bid: adaptability coefficient)")
-        plt.title("Cost of Target EV as a Function of its Bid")
+        plt.xlabel("Bid: disconnection time", labelpad=15)  # Increased labelpad for x-axis
+        plt.ylabel("Bid: adaptability coefficient", labelpad=15)  # Increased labelpad for y-axis
+        # plt.title("Cost of Target EV as a Function of its Bid")
         
         # If true_tau and true_alpha are provided, highlight that cell.
         if true_tau is not None and true_alpha is not None:

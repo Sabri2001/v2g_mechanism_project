@@ -57,7 +57,7 @@ class ConfigHandler:
             ev["battery_wear_cost_coefficient"] = round(ev["battery_wear_cost_coefficient"]*self.battery_factor,2)
 
         if "granularity" not in self.config:
-            self.config["granularity"] = 1.0
+            self.config["granularity"] = 1
 
         # Load models
         self._load_alpha_model(self.config["alpha_model_path"])

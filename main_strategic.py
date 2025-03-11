@@ -33,11 +33,11 @@ def run_experiment(experiment_class, config, output_dir, experiment_type, run_id
 
     logging.info(f"Completed {experiment_type}, Run ID: {run_id}")
 
-def run_nash_check(config, base_output_dir):
+def run_strategy_check(config, base_output_dir):
     """
     For each combination of candidate bids for the EV indicated by 'ev_nash' (from tau_nash and alpha_nash),
     modify that EV's bid in the configuration, run the ADMM (coordinated) experiment, and compute
-    its actual utility (as energy_cost + congestion_cost + adaptability_cost, where
+    its actual utility (as energy_cost + adaptability_cost, where
     adaptability_cost is computed using the true parameters). Finally, produce a grid plot.
     """
     tau_values = config.get("tau_nash", [])
@@ -101,9 +101,8 @@ def run_nash_check(config, base_output_dir):
             adaptability_cost = 0.5 * current_true_alpha * ((current_true_tau - t_actual) ** 2)
             # Get the energy_cost and congestion_cost for the target EV from the results.
             energy_cost = results.get("energy_cost", {}).get(ev_nash_id, 0)
-            congestion_cost = results.get("congestion_cost", {}).get(ev_nash_id, 0)
-            # Total cost is the sum of these three components.
-            cost = energy_cost + congestion_cost + adaptability_cost
+            # Total cost is the sum of these two components.
+            cost = energy_cost + adaptability_cost
 
             cost_grid[j, i] = cost # row: alpha index, col: tau index
             logging.info(f"Nash check: tau {tau_bid}, alpha {alpha_bid}, cost {cost}")
@@ -191,7 +190,7 @@ def main(config_path):
     # 5) If nash_check is enabled, run the Nash check branch.
     if config.get("nash_check", False):
         logging.info("Starting Nash check grid experiment.")
-        run_nash_check(config, base_output_dir)
+        run_strategy_check(config, base_output_dir)
 
     # 6) Generate Summary Plots (Across All Runs)
     summary_handler = SummaryResultHandler(base_output_dir, experiment_types)
