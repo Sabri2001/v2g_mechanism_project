@@ -39,12 +39,19 @@ class ConfigHandler:
     # Public Methods
     # -------------------------------------------------------------------------
 
-    def load_config(self):
+    def load_config(self, alpha_factor_override=None, battery_factor_override=None):
         """
         Loads and validates the YAML configuration, initializes random seed,
         and prepares either stochastic or static data.
         """
         self._read_yaml()
+
+         # Override parameters if provided
+        if alpha_factor_override is not None:
+            self.config["alpha_factor"] = alpha_factor_override
+        if battery_factor_override is not None:
+            self.config["battery_factor"] = battery_factor_override
+
         self._validate_config_fields()
         self._init_random_state()
 
@@ -54,7 +61,7 @@ class ConfigHandler:
         
         self.battery_factor = self.config.get("battery_factor", 1.0)
         for ev in self.config["evs"]:
-            ev["battery_wear_cost_coefficient"] = round(ev["battery_wear_cost_coefficient"]*self.battery_factor,2)
+            ev["battery_wear_cost_coefficient"] = round(ev["battery_wear_cost_coefficient"]*self.battery_factor,5)
 
         if "granularity" not in self.config:
             self.config["granularity"] = 1
@@ -233,7 +240,7 @@ class ConfigHandler:
         """
         market_prices_csv = self.config["market_prices_csv"]
         time_range = self.config["time_range"]
-        df = pd.read_csv(market_prices_csv)
+        df = pd.read_csv(market_prices_csv, parse_dates=["Date"])  # parse_dates ensures Date is a proper Timestamp
 
         start_time, end_time = time_range
         # Format hours as two-digit strings (e.g., "01", "02", ...)
@@ -244,12 +251,42 @@ class ConfigHandler:
         if not all(col in df.columns for col in required_columns):
             raise ValueError("Market prices CSV does not contain all required columns.")
 
-        # Sample exactly one row
-        filtered_df = df[required_columns]
-        sampled_row = filtered_df.sample(n=1, random_state=self.random_state)
-        day_date = sampled_row.iloc[0]["Date"]
+        # If extreme_days is True, filter to a specific list of dates
+        if self.config.get("extreme_days", False):
+            EXTREME_DATES = [
+                "2023-11-29",
+                "2023-12-06",
+                "2023-12-07",
+                "2024-01-15",
+                "2024-01-16",
+                "2024-01-17",
+                "2024-01-18",
+                "2024-01-19",
+                "2024-01-22",
+                "2024-01-30",
+                "2024-06-19",
+                "2024-06-20",
+                "2024-07-10",
+                "2024-07-15",
+                "2024-07-16",
+                "2024-07-17",
+                "2024-08-01",
+                "2024-08-02"
+            ]
+            # convert them to pd.Timestamp if needed
+            extreme_timestamps = [pd.Timestamp(d) for d in EXTREME_DATES]
+            df = df[df["Date"].isin(extreme_timestamps)]
+            if df.empty:
+                raise ValueError("No market price rows match the requested extreme days!")
 
-        # Convert from $/MWh to $/kWh and apply price_factor
+        # Now we only have the relevant rows
+        filtered_df = df[required_columns]
+
+        # sample exactly one row
+        sampled_row = filtered_df.sample(n=1, random_state=self.random_state)
+        day_date = str(sampled_row.iloc[0]["Date"])
+
+        # convert from $/MWh to $/kWh and apply price_factor
         prices = [
             (price / 1000) * self.price_factor
             for price in sampled_row.iloc[0][time_columns].tolist()
@@ -273,6 +310,8 @@ class ConfigHandler:
         start_time, end_time = self.config["time_range"]
         sampled_evs = []
 
+        alpha_deterministic = self.config.get("alpha_deterministic", False)
+
         for ev in self.config["evs"]:
             ev_copy = ev.copy()
 
@@ -280,8 +319,16 @@ class ConfigHandler:
             alpha_idx = self.random_state.choice(len(alpha_weights), p=alpha_weights)
             alpha_mean = alpha_means[alpha_idx][0]
             alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])  # 1D
-            sampled_alpha = self.random_state.normal(loc=alpha_mean, scale=alpha_std)
-            ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor, 3)
+            if not alpha_deterministic:
+                alpha_idx = self.random_state.choice(len(alpha_weights), p=alpha_weights)
+                alpha_mean = alpha_means[alpha_idx][0]
+                alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])
+                sampled_alpha = self.random_state.normal(loc=alpha_mean, scale=alpha_std)
+                ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor, 5)
+            else:
+                ev_copy["disconnection_time_flexibility"] = round(
+                    ev_copy["disconnection_time_flexibility"] * self.alpha_factor, 5
+                )
 
             # 2) Sample disconnect_time
             disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)
@@ -289,7 +336,7 @@ class ConfigHandler:
             disc_std = np.sqrt(disc_covs[disc_idx][0][0])
             sampled_disconnect = int(round(self.random_state.normal(loc=disc_mean, scale=disc_std)))
             # Clamp to valid time range
-            ev_copy["disconnect_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
+            ev_copy["disconnection_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
 
             # 3) Sample (initial_soc, desired_soc) and min_soc
             ev_copy = self._sample_soc(ev_copy)

@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.ticker as ticker
 import seaborn as sns
 from matplotlib.patches import Rectangle
+import pandas as pd
 
 
 class PlotHandler:
@@ -268,41 +269,28 @@ class PlotHandler:
         Compute the percentage gap between ADMM and Optimal solutions,
         and display it as a violin plot across all experiment runs.
 
-        Assumes:
-            results_by_experiment = {
-                "coordinated":    [ { "sum_operator_costs": ... }, ... ],
-                "centralized": [ { "sum_operator_costs": ... }, ... ]
-            }
-
         Args:
             results_by_experiment (dict): Dict of lists of run results.
             output_path (str): Path to save the output plot.
         """
         sns.set(style="whitegrid")
 
-        # Extract costs
         admm_costs = [run["sum_operator_costs"] for run in results_by_experiment["coordinated"]]
-        opt_costs  = [run["sum_operator_costs"] for run in results_by_experiment["centralized"]]
+        opt_costs = [run["sum_operator_costs"] for run in results_by_experiment["centralized"]]
 
-        # Compute gap for each run: Gap (%) = 100 * (ADMM - Optimal) / Optimal
         gaps = []
-        for i in range(len(admm_costs)):
-            if opt_costs[i] == 0:
-                # Safety check in case Optimal = 0
-                gaps.append(0.0)
-            else:
-                gap = 100.0 * (admm_costs[i] - opt_costs[i]) / opt_costs[i]
-                gaps.append(gap)
+        for admm, opt in zip(admm_costs, opt_costs):
+            gap = 0.0 if opt == 0 else 100.0 * (admm - opt) / opt
+            gaps.append(gap)
 
-        # Create a violin plot of the gaps
         fig, ax = plt.subplots(figsize=(8, 5))
         sns.violinplot(x=gaps, ax=ax, orient='h', cut=0)
 
-        # Optional line to show 0% gap reference
         ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
 
-        ax.set_xlabel("Gap (%)", fontsize=12)
-        ax.set_title("Violin Plot: ADMM vs. Optimal Gap Distribution", fontsize=14)
+        # Adjust padding and remove title
+        ax.set_xlabel("Gap (%)", fontsize=12, labelpad=15)
+        ax.set_ylabel("", labelpad=15)  # No y-label, but increased padding if needed
 
         plt.tight_layout()
         plt.savefig(output_path)
@@ -569,3 +557,473 @@ class PlotHandler:
         plt.savefig(output_path)
         plt.close()
         logging.info(f"Plot 'nash_grid' saved to {output_path}")
+
+    @staticmethod
+    def plot_cost_savings_vs_alpha(plot_data, output_path):
+        """
+        Expects plot_data as a dictionary where keys are battery_factor values and values are dictionaries with:
+        - "alpha": list of alpha_factor values (x-axis)
+        - "mean": list of mean cost savings (%) for that battery_factor
+        - "std": list of standard deviations of cost savings
+        Each battery_factor will be represented as a separate line on the plot.
+        """
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(10, 6))
+        for battery_factor, data in plot_data.items():
+            plt.errorbar(
+                data["alpha"], data["mean"], yerr=data["std"],
+                label=f'Battery Factor {battery_factor}', marker='o', capsize=5
+            )
+        plt.xlabel("Alpha Factor")
+        plt.ylabel("Cost Savings (%)")
+        # plt.title("Cost Savings vs. Alpha Factor for different Battery Factors")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        import logging
+        logging.info(f"Plot 'cost_savings_vs_alpha' saved to {output_path}")
+
+    @staticmethod
+    def plot_cost_savings_bars(chart_data, output_path):
+        """
+        chart_data is a dict of dicts, e.g.:
+        {
+            xp_label: {
+            bf_value: [list of runs' total_costs],
+            ...
+            },
+            ...
+        }
+        We'll produce a grouped bar chart:
+        x-axis: xp_label (in alphabetical or custom order)
+        for each xp_label group, 2 bars for battery_factor=1.0, 0.25 (colors).
+        Error bars = std of each [list of runs].
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import seaborn as sns
+
+        sns.set(style="whitegrid")
+
+        xp_labels = list(chart_data.keys())
+        # We'll define battery_factors in a consistent order. 
+        battery_factors = [1.0, 0.25]
+
+        x = np.arange(len(xp_labels))  # positions for xp groups
+        width = 0.3  # width of each bar
+
+        fig, ax = plt.subplots(figsize=(10, 6))
+
+        # For each battery_factor, we offset the bar positions slightly
+        offsets = {
+            1.0: -width/2,
+            0.25: width/2
+        }
+        colors = {
+            1.0: 'blue',
+            0.25: 'orange'
+        }
+
+        # We'll loop over battery_factors, then plot bars for each xp_label
+        for bf in battery_factors:
+            means = []
+            stds = []
+            for xp_label in xp_labels:
+                runs_list = chart_data[xp_label].get(bf, [])
+                if runs_list:
+                    mean_val = np.mean(runs_list)
+                    std_val = np.std(runs_list)
+                else:
+                    mean_val = 0
+                    std_val = 0
+                means.append(mean_val)
+                stds.append(std_val)
+
+            # compute the bar positions for this battery_factor
+            bar_positions = x + offsets[bf]
+
+            # plot
+            ax.bar(
+                bar_positions,
+                means,
+                width,
+                label=f"BF={bf}",
+                yerr=stds,
+                capsize=5,
+                color=colors[bf],
+                alpha=0.7
+            )
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(xp_labels, fontsize=10)
+
+        # Increase labelpad for more spacing to the axes
+        ax.set_xlabel("Experiment Setup", fontsize=12, labelpad=15)
+        ax.set_ylabel("Total Cost ($)", fontsize=12, labelpad=15)
+
+        ax.legend(title="Battery Factor")
+
+        fig.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+
+        import logging
+        logging.info(f"Plot 'cost_savings_bars' saved to {output_path}")
+
+    @staticmethod
+    def plot_fake_alpha_tau_bars(chart_data, output_path):
+        """
+        Bar chart with 3 bars (one for each scenario),
+        plus std error bars from the run-to-run variation.
+        """
+        import matplotlib.pyplot as plt
+        import numpy as np
+        import seaborn as sns
+
+        sns.set(style="whitegrid")
+
+        xp_labels = list(chart_data.keys()) 
+        means = []
+        stds = []
+        for xp_label in xp_labels:
+            runs_list = chart_data[xp_label]
+            mean_val = np.mean(runs_list)
+            std_val  = np.std(runs_list)
+            means.append(mean_val)
+            stds.append(std_val)
+
+        x_positions = np.arange(len(xp_labels))
+        width = 0.5  # single bar width
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        ax.bar(
+            x_positions,
+            means,
+            width,
+            yerr=stds,
+            capsize=5,
+            color=["blue", "orange", "green"][:len(xp_labels)],
+            alpha=0.7
+        )
+        ax.set_xticks(x_positions)
+        ax.set_xticklabels(xp_labels, fontsize=10)
+        ax.set_xlabel("Scenario", fontsize=12, labelpad=10)
+        ax.set_ylabel("Total Cost ($)", fontsize=12, labelpad=10)
+
+        fig.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+
+        import logging
+        logging.info(f"Plot 'fake_alpha_tau_bars' saved to {output_path}")
+
+    @staticmethod
+    def plot_admm_iterations_violin(results_by_experiment, output_path):
+        """
+        Produces a horizontal violin plot of the ADMM iteration counts
+        for the 'coordinated' experiment, separated by nu_multiplier (1.0 vs 1.1).
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+        import logging
+
+        coordinated_runs = results_by_experiment.get("coordinated", [])
+
+        data_rows = []
+        for run_results in coordinated_runs:
+            iters = run_results.get("admm_iterations", None)
+            nu_mult = run_results.get("nu_multiplier", None)
+
+            if iters is not None and nu_mult is not None and nu_mult in [1.0, 1.1]:
+                data_rows.append({
+                    "nu_multiplier": nu_mult,
+                    "admm_iterations": iters
+                })
+
+        if not data_rows:
+            logging.warning("No ADMM iteration data (with nu_multiplier=1.0 or 1.1) found. Skipping plot.")
+            return
+
+        df = pd.DataFrame(data_rows)
+
+        sns.set(style="whitegrid")
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        sns.violinplot(
+            data=df,
+            y="nu_multiplier",
+            x="admm_iterations",
+            orient="h",
+            cut=0,
+            ax=ax
+        )
+
+        # Increased padding around axis labels
+        ax.set_xlabel("ADMM Iterations", fontsize=12, labelpad=15)
+        ax.set_ylabel("nu_multiplier", fontsize=12, labelpad=15)
+        # ax.set_title(...) removed as requested
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Plot 'admm_iterations_violin' saved to {output_path}")
+
+    @staticmethod
+    def plot_vcg_tax_violin(results_by_experiment, output_path):
+        """
+        Creates a violin + swarm plot on a symlog x-axis for total VCG taxes
+        (as a percentage of total energy costs) across all runs/experiment types.
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import numpy as np
+        import pandas as pd
+        import logging
+
+        # Collect VCG tax percentages
+        vcg_tax_percentages = []
+        for xp_type, runs_list in results_by_experiment.items():
+            for run_results in runs_list:
+                if "vcg_tax" in run_results:
+                    total_vcg_tax = sum(run_results["vcg_tax"].values())
+                    total_energy_cost = run_results.get("sum_energy_costs", 0.0)
+                    if total_energy_cost != 0.0:
+                        pct = (total_vcg_tax / total_energy_cost) * 100
+                        vcg_tax_percentages.append(pct)
+                    else:
+                        logging.warning("Total energy cost is zero; skipping run.")
+
+        if not vcg_tax_percentages:
+            logging.warning("No VCG tax data found. Skipping 'plot_vcg_tax_violin'.")
+            return
+
+        # Prepare data for Seaborn
+        df = pd.DataFrame({
+            "value": vcg_tax_percentages,
+            "category": ["VCG Tax Distribution"] * len(vcg_tax_percentages)
+        })
+
+        sns.set(style="whitegrid")
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        # Violin plot (horizontal) for distribution shape
+        sns.violinplot(
+            x="value",
+            y="category",
+            data=df,
+            orient="h",
+            ax=ax,
+            inner=None,  # no internal lines
+            color="lightblue",
+            cut=0         # limit the kernel extension
+        )
+
+        # Swarm plot to show individual points
+        sns.swarmplot(
+            x="value",
+            y="category",
+            data=df,
+            orient="h",
+            ax=ax,
+            color="black",
+            size=4
+        )
+
+        # Symmetrical log scale to handle negative & large positive values
+        ax.set_xscale("symlog", linthresh=1)
+
+        # Reference lines
+        ax.axvline(x=0, color="red", linestyle="--", linewidth=1)
+        mean_val = np.mean(vcg_tax_percentages)
+        ax.axvline(mean_val, color="blue", linestyle="-", linewidth=1,
+                label=f"Mean = {mean_val:.2f}")
+        ax.legend()
+
+        # Hide the single category label
+        ax.set_ylabel("")      # remove y-axis label
+        ax.set_yticks([])      # remove the category text on the y-axis
+
+        # Increase space between x-axis label and the plot
+        ax.set_xlabel("VCG Tax (% of Energy Costs)", fontsize=12, labelpad=20)
+
+        # Final layout and save
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Plot 'vcg_tax_violin' saved to {output_path}")
+
+    @staticmethod
+    def plot_warmstart(times_dict, output_path):
+        """
+        Creates a boxplot of partial scheduling times
+        for ADMM vs. Gurobi, comparing No Warmstart vs. Warmstart.
+
+        times_dict keys:
+        - "coord_no_ws": ADMM partial no-warmstart times (list of floats)
+        - "coord_ws": ADMM partial warmstart times (list of floats)
+        - "cent_no_ws": Gurobi partial no-warmstart times (list of floats)
+        - "cent_ws": Gurobi partial warmstart times (list of floats)
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import pandas as pd
+
+        # DataFrame construction
+        df_plot = pd.concat([
+            pd.DataFrame({"time": times_dict["coord_no_ws"], "method": "ADMM", "warmstart": "No Warmstart"}),
+            pd.DataFrame({"time": times_dict["coord_ws"], "method": "ADMM", "warmstart": "Warmstart"}),
+            pd.DataFrame({"time": times_dict["cent_no_ws"], "method": "Gurobi", "warmstart": "No Warmstart"}),
+            pd.DataFrame({"time": times_dict["cent_ws"], "method": "Gurobi", "warmstart": "Warmstart"}),
+        ], ignore_index=True)
+
+        # Plot
+        sns.set(style="whitegrid")
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        sns.boxplot(
+            x="method",
+            y="time",
+            hue="warmstart",
+            data=df_plot,
+            palette="Set2",
+            ax=ax
+        )
+
+        # Labels and padding
+        ax.set_xlabel("Method", fontsize=12, labelpad=15)
+        ax.set_ylabel("Computation Time (s)", fontsize=12, labelpad=15)
+
+        # Logarithmic y-axis
+        ax.set_yscale("log")
+
+        ax.legend(title="")
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+
+    # @staticmethod
+    # def plot_warmstart(times_dict, output_path):
+    #     """
+    #     Creates a grouped bar chart (mean ± std) of partial scheduling times
+    #     for ADMM vs. Gurobi, comparing No Warmstart vs. Warmstart.
+        
+    #     times_dict keys:
+    #     - "coord_no_ws": ADMM partial no-warmstart times
+    #     - "coord_ws": ADMM partial warmstart times
+    #     - "cent_no_ws": Gurobi partial no-warmstart times
+    #     - "cent_ws": Gurobi partial warmstart times
+    #     """
+    #     import matplotlib.pyplot as plt
+    #     import numpy as np
+    #     import seaborn as sns
+
+    #     sns.set(style="whitegrid")
+
+    #     # Means and stds
+    #     coord_no_ws_mean = np.mean(times_dict["coord_no_ws"])
+    #     coord_no_ws_std  = np.std(times_dict["coord_no_ws"])
+    #     coord_ws_mean    = np.mean(times_dict["coord_ws"])
+    #     coord_ws_std     = np.std(times_dict["coord_ws"])
+
+    #     cent_no_ws_mean = np.mean(times_dict["cent_no_ws"])
+    #     cent_no_ws_std  = np.std(times_dict["cent_no_ws"])
+    #     cent_ws_mean    = np.mean(times_dict["cent_ws"])
+    #     cent_ws_std     = np.std(times_dict["cent_ws"])
+
+    #     # Two categories on the x-axis: 0 -> ADMM, 1 -> Gurobi
+    #     x = np.arange(2)
+    #     width = 0.35
+
+    #     # We define arrays for No Warmstart and Warmstart
+    #     no_ws_means = [coord_no_ws_mean, cent_no_ws_mean]
+    #     no_ws_stds  = [coord_no_ws_std,  cent_no_ws_std]
+    #     ws_means    = [coord_ws_mean,    cent_ws_mean]
+    #     ws_stds     = [coord_ws_std,     cent_ws_std]
+
+    #     fig, ax = plt.subplots(figsize=(8, 5))
+
+    #     # Plot No Warmstart bars (shift left)
+    #     ax.bar(
+    #         x - width/2, no_ws_means, width,
+    #         yerr=no_ws_stds, capsize=5,
+    #         alpha=0.8, label="No Warmstart"
+    #     )
+
+    #     # Plot Warmstart bars (shift right)
+    #     ax.bar(
+    #         x + width/2, ws_means, width,
+    #         yerr=ws_stds, capsize=5,
+    #         alpha=0.8, label="Warmstart"
+    #     )
+
+    #     # X-axis labels
+    #     ax.set_xticks(x)
+    #     ax.set_xticklabels(["ADMM", "Gurobi"], fontsize=11)
+
+    #     ax.set_ylabel("Computation Time (s)", fontsize=12)
+    #     ax.set_title("Partial Scheduling: No Warmstart vs. Warmstart", fontsize=13)
+
+    #     ax.legend(fontsize=10)
+
+    #     plt.tight_layout()
+    #     plt.savefig(output_path)
+    #     plt.close()
+
+    # @staticmethod
+    # def plot_vcg_tax_violin(results_by_experiment, output_path):
+        # """
+        # Creates a violin plot of total VCG taxes as a percentage of total energy costs,
+        # for all runs (across all experiment types) in a single distribution.
+        
+        # The percentage is computed as:
+        #     100 * ( sum of all EVs' vcg_tax ) / ( sum_energy_costs ).
+        # """
+        # import matplotlib.pyplot as plt
+        # import seaborn as sns
+        # import numpy as np
+        # import logging
+
+        # # Gather VCG tax % data from all experiment types (if present).
+        # vcg_tax_percentages = []
+        # for xp_type, runs_list in results_by_experiment.items():
+        #     for run_results in runs_list:
+        #         # Only consider runs that actually have vcg_tax computed
+        #         if "vcg_tax" in run_results:
+        #             total_vcg_tax = sum(run_results["vcg_tax"].values())
+        #             print(f"Total VCG tax for run: {total_vcg_tax}")
+        #             total_energy_cost = run_results.get("sum_energy_costs", 0.0)
+        #             print(f"Total energy cost for run: {total_energy_cost}")
+
+        #             if total_energy_cost != 0.0:
+        #                 vcg_tax_pct = (total_vcg_tax / total_energy_cost) * 100
+        #                 vcg_tax_percentages.append(vcg_tax_pct)
+        #             else:
+        #                 print("Warning: Total energy cost is zero, skipping this run.")
+        #                 pass
+
+        # if not vcg_tax_percentages:
+        #     logging.warning("No VCG tax data found to plot. Skipping 'plot_vcg_tax_violin'.")
+        #     return
+
+        # # Create a single violin plot, similarly to plot_gap_violin
+        # sns.set(style="whitegrid")
+        # fig, ax = plt.subplots(figsize=(8, 5))
+
+        # # Plot horizontally with cut=0 to avoid extending tails
+        # sns.violinplot(x=vcg_tax_percentages, orient='h', cut=0, ax=ax)
+        
+        # # Optional vertical reference line at 0
+        # ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
+
+        # ax.set_xlabel("VCG Tax (% of Energy Costs)", fontsize=12)
+        # # ax.set_title("Violin Plot: Distribution of VCG Taxes as % of Energy Costs", fontsize=14)
+
+        # plt.tight_layout()
+        # plt.savefig(output_path)
+        # plt.close()
+        # logging.info(f"Plot 'vcg_tax_violin' saved to {output_path}")

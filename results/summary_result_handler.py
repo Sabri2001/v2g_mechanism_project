@@ -2,6 +2,7 @@ import os
 import json
 import logging
 from typing import List, Dict, Any
+import numpy as np
 
 from results.plot_handler import PlotHandler
 
@@ -75,6 +76,16 @@ class SummaryResultHandler:
         Args:
             plots (List[str]): List of requested plot identifiers, e.g. ["total_cost_bars", "v2g_fraction"].
         """
+        if "admm_iterations_violin" in plots:
+            output_path = os.path.join(self.base_output_dir, "admm_iterations_violin.png")
+            PlotHandler.plot_admm_iterations_violin(self.results_by_experiment, output_path)
+            logging.info(f"ADMM iterations violin plot saved to {output_path}")
+
+        if "vcg_tax_violin" in plots:
+            output_path = os.path.join(self.base_output_dir, "vcg_tax_violin.png")
+            PlotHandler.plot_vcg_tax_violin(self.results_by_experiment, output_path)
+            logging.info(f"VCG tax violin plot saved to {output_path}")
+        
         if "gap_violin" in plots:
             output_path = os.path.join(self.base_output_dir, "gap_violin.png")
             PlotHandler.plot_gap_violin(self.results_by_experiment, output_path)
@@ -110,3 +121,62 @@ class SummaryResultHandler:
             output_path = os.path.join(self.base_output_dir, "v2g_fraction.png")
             PlotHandler.plot_v2g_fraction_bars(self.results_by_experiment, output_path)
             logging.info(f"Energy transferred fraction plot saved to {output_path}")
+
+    def save_computation_time_stats(self, filename: str = "computation_time_stats.json"):
+        """
+        Saves robust summary statistics (median, quartiles, min, max)
+        of computation times for each experiment type into a JSON file.
+        """
+        import json
+        import logging
+        import numpy as np
+        import os
+
+        comp_time_stats = {}
+
+        for xp_type in self.experiment_types:
+            # Skip if we have no results for that experiment type
+            if xp_type not in self.results_by_experiment:
+                continue
+
+            times = []
+            for run_result in self.results_by_experiment[xp_type]:
+                if "computation_time" in run_result:
+                    times.append(run_result["computation_time"])
+
+            if times:
+                arr = np.array(times)
+                median_time = float(np.median(arr))
+                q1_time = float(np.percentile(arr, 25))
+                q3_time = float(np.percentile(arr, 75))
+                min_time = float(np.min(arr))
+                max_time = float(np.max(arr))
+
+                comp_time_stats[xp_type] = {
+                    "median_computation_time_s": median_time,
+                    "q1_computation_time_s": q1_time,
+                    "q3_computation_time_s": q3_time,
+                    "min_computation_time_s": min_time,
+                    "max_computation_time_s": max_time
+                }
+
+                logging.info(
+                    f"[{xp_type}] Computation Time -> "
+                    f"median={median_time:.4f}s, q1={q1_time:.4f}s, q3={q3_time:.4f}s, "
+                    f"min={min_time:.4f}s, max={max_time:.4f}s"
+                )
+            else:
+                comp_time_stats[xp_type] = {
+                    "median_computation_time_s": None,
+                    "q1_computation_time_s": None,
+                    "q3_computation_time_s": None,
+                    "min_computation_time_s": None,
+                    "max_computation_time_s": None
+                }
+
+        # Save to JSON in the base output directory
+        output_path = os.path.join(self.base_output_dir, filename)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(comp_time_stats, f, indent=2)
+
+        logging.info(f"Computation time stats written to {output_path}.")

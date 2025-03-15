@@ -18,7 +18,7 @@ class ADMM:
         tol: float = 1e-3,
         local_subproblem_fn=None,
         global_step_fn=None
-    ):
+        ):
         """
         Args:
             num_agents (int): Number of agents (EVs).
@@ -60,6 +60,8 @@ class ADMM:
         Returns:
             dict: The final iteration_state dictionary after ADMM converges or reaches max_iter.
         """
+        self.iter_count = 0
+
         for iteration in range(self.max_iter):
             logging.debug(f"\n=== ADMM Iteration {iteration} ===")
 
@@ -81,13 +83,15 @@ class ADMM:
 
             if dual_diff < self.tol:
                 logging.info(f"ADMM converged after {iteration} iterations.")
+                self.iter_count = iteration + 1
                 break
             else:
                 self.nu *= self.nu_multiplier  # Increase penalty parameter for better convergence
 
         if iteration == self.max_iter - 1:
             logging.warning(f"ADMM reached max_iter={self.max_iter} without converging.")
-
+            self.iter_count = self.max_iter
+            
         return self.iteration_state
 
     def _snapshot_of_duals(self):

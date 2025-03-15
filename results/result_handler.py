@@ -18,7 +18,7 @@ class ResultHandler:
         base_output_dir: str,
         experiment_type: str,
         run_id: Union[int, str],
-    ):
+        ):
         """
         Initializes the ResultHandler.
 

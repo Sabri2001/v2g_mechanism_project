@@ -21,32 +21,22 @@ def run_experiment(experiment_class, config, output_dir, experiment_type, run_id
     """
     logging.info(f"Running {experiment_type}, Run ID: {run_id}")
 
-    # Instantiate the experiment
+    # Instantiate and run the experiment
     experiment = experiment_class(config)
-    
-    # Measure computation time
-    import time
-    start_time = time.time()
-    
-    # Run the experiment
     results = experiment.run()
-    
-    # Record computation time
-    computation_time = time.time() - start_time
-    results["computation_time"] = computation_time
-    
-    logging.info(f"Completed {experiment_type}, Run ID: {run_id}, Computation Time: {computation_time:.4f}s")
 
     # Save results (plots, logs) for this run
     result_handler = ResultHandler(config, results, output_dir, experiment_type, run_id)
     result_handler.save()
 
+    logging.info(f"Completed {experiment_type}, Run ID: {run_id}")
+
 def main(config_path):
     """
     Main entry point for running EV charging experiments.
 
-    Args:
-        config_path (str): Path to the YAML configuration file.
+    We explicitly loop over two different nu_multipliers (1.0 and 1.1),
+    and for each multiplier, run all experiments for all sampled runs.
     """
     # Set up logging
     logging.basicConfig(
@@ -89,40 +79,49 @@ def main(config_path):
     if not experiment_types:
         raise ValueError("No experiment types specified in the configuration.")
 
-    # 4) Run Each Experiment for Each Sampled Run
-    for run_data in sampled_data_per_run:
-        run_id = run_data["run_id"]
-        sampled_day_data = run_data["sampled_day_data"]
-        evs = run_data["evs"]
+    # 4) For each nu_multiplier, run each experiment for each sampled run
+    #    This yields multiple runs, each with a different nu_multiplier
+    multipliers = [1.0, 1.1]
+    for nm in multipliers:
+        # Overwrite the config's nu_multiplier
+        logging.info(f"===== Starting runs with nu_multiplier={nm} =====")
+        config["nu_multiplier"] = nm
 
-        # Update config with sampled data
-        config["market_prices"] = sampled_day_data["prices"]
-        config["sampled_day_date"] = sampled_day_data["date"]
-        config["evs"] = evs
+        for run_data in sampled_data_per_run:
+            run_id = run_data["run_id"]
+            sampled_day_data = run_data["sampled_day_data"]
+            evs = run_data["evs"]
 
-        # Run each requested experiment
-        for experiment_type in experiment_types:
-            if experiment_type not in experiment_classes:
-                logging.warning(f"Skipping invalid experiment type: {experiment_type}")
-                continue
+            # Update config with sampled data
+            config["market_prices"] = sampled_day_data["prices"]
+            config["sampled_day_date"] = sampled_day_data["date"]
+            config["evs"] = evs
 
-            experiment_class = experiment_classes[experiment_type]
-            run_experiment(
-                experiment_class=experiment_class,
-                config=config,
-                output_dir=base_output_dir,
-                experiment_type=experiment_type,
-                run_id=run_id,
-                sampled_day_data=sampled_day_data
-            )
+            # We'll incorporate the multiplier into the run_id for clarity
+            run_id_str = f"{run_id}_nm{nm}"
 
-    logging.info("All experiments completed.")
+            # Run each requested experiment
+            for experiment_type in experiment_types:
+                if experiment_type not in experiment_classes:
+                    logging.warning(f"Skipping invalid experiment type: {experiment_type}")
+                    continue
+
+                experiment_class = experiment_classes[experiment_type]
+                run_experiment(
+                    experiment_class=experiment_class,
+                    config=config,
+                    output_dir=base_output_dir,
+                    experiment_type=experiment_type,
+                    run_id=run_id_str,
+                    sampled_day_data=sampled_day_data
+                )
+
+    logging.info("All experiments completed for both nu_multiplier=1.0 and 1.1.")
 
     # 5) Generate Summary Plots (Across All Runs)
     summary_handler = SummaryResultHandler(base_output_dir, experiment_types)
     summary_handler.aggregate_results()
     summary_handler.generate_summary_plots(config.get("plots", []))
-    summary_handler.save_computation_time_stats()
 
 
 if __name__ == "__main__":
@@ -131,4 +130,4 @@ if __name__ == "__main__":
         sys.exit(1)
 
     config_file = sys.argv[1]
-    main(config_file)    
+    main(config_file)

@@ -3,6 +3,7 @@ import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 import copy
+import time
 
 from experiments.base_experiment import BaseExperiment
 
@@ -13,6 +14,12 @@ class CentralizedSchedulingExperiment(BaseExperiment):
     All EVs are optimized simultaneously subject to their individual constraints
     and the global EVCS power limit.
     """
+    def __init__(self, config):
+        super().__init__(config)
+        self.warmstart_solutions = None
+
+    def apply_warmstart(self, warmstart_dict):
+        self.warmstart_solutions = warmstart_dict
     
     def run(self):
         # 1) Extract common data from config
@@ -59,6 +66,17 @@ class CentralizedSchedulingExperiment(BaseExperiment):
                 "t_actual": t_actual,
                 "M": M
             }
+        if self.warmstart_solutions is not None:
+            for ev in evs:
+                ev_id = ev["id"]
+                if ev_id in self.warmstart_solutions:
+                    for t in range(T):
+                        # Suppose your var for EV ev_id is: EV_vars[ev_id]["u"][t]
+                        # Then set:
+                        EV_vars[ev_id]["u"][t].start = self.warmstart_solutions[ev_id][t]
+
+            # Then also set model.params.AdvBasis = 1 if Gurobi version requires it:
+            model.update()
         
         # 3) Add global constraints: For each time period t, the sum over EVs of abs_u must not exceed the EVCS power limit.
         global_constraints = {}
@@ -170,9 +188,13 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         model.setObjective(total_cost, GRB.MINIMIZE)
         
         # 6) Solve the centralized model.
+        start_t = time.time()
         model.optimize()
+        solve_time = time.time() - start_t
         if model.status != GRB.OPTIMAL:
             logging.warning("Centralized model did not solve to optimality.")
+        else:
+            logging.info(f"Centralized scheduling took {solve_time:.2f} seconds.")
         
         # 7) Extract and aggregate results.
         # Prepare time‐indexed cost vectors and SoC evolution per EV.
@@ -219,6 +241,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             "desired_disconnection_time": desired_disconnection_time,
             "actual_disconnection_time": actual_disconnection_time,
             "v2g_fraction": v2g_fraction,
+            "solve_time": solve_time,
         }
         
         # 8) Additional metrics if "walras_tax" is enabled.

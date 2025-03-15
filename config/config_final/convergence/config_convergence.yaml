@@ -1,18 +1,21 @@
+# To run with main_convergence.py
+
+
 # NAME XP
-folder: "final/tests"
-name_xp: "json_pb"
+folder: "final/convergence"
+name_xp: "convergence"
 
 # EXPERIMENT TYPE
 experiment_types: ["coordinated"]
   # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated" or "centralized"
 
 # NUMBER OF RUNS
-num_runs: 1
+num_runs: 20
 
 # ADMM PARAMETERS
 nu: 0.1
 nu_multiplier: 1.1
-max_iter: 20
+max_iter: 100
 
 # SIMULATION PARAMETERS
 stochastic: true
@@ -22,7 +25,7 @@ market_prices: [141.93,134.66,131.39,132.57,138.1,151.38,144.9,223.78,198.09,171
 # market_prices: [40.12, 42.28, 43.46, 46.59, 60.65, 65.67, 70.41, 85.57, 142.20, 248.21, 116.28, 82.23] # July 12, in $/MWh, 10 AM to 10 PM, California
 granularity: 4
 market_prices_csv: "C:/Users/sabri/Projects/v2g_mechanism_project/data/processed/day_ahead_prices/hub_prices.csv"
-evcs_power_limit: 15 # so oversubscription of 2.2 
+evcs_power_limit: 10 # so oversubscription of 3.3 
 alpha_factor: 1.0
 battery_factor: 1.0
 alpha_model_path: "models/gmm_alpha.pkl"
@@ -96,10 +99,6 @@ evs:
 # vcg: true
 
 plots:
-  #- total_cost_vs_energy_cost
   - soc_evolution
   - market_prices
-  # - total_cost_bars
-  # - payment_comparison
-  # - total_cost_benchmarking
-  - v2g_fraction
+  - admm_iterations_violin

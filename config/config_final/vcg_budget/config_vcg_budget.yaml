@@ -1,18 +1,21 @@
+# To run with main.py
+
+
 # NAME XP
-folder: "final/tests"
-name_xp: "json_pb"
+folder: "final/vcg_budget"
+name_xp: "2_2_oversubscription"
 
 # EXPERIMENT TYPE
 experiment_types: ["coordinated"]
   # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated" or "centralized"
 
 # NUMBER OF RUNS
-num_runs: 1
+num_runs: 20
 
 # ADMM PARAMETERS
 nu: 0.1
 nu_multiplier: 1.1
-max_iter: 20
+max_iter: 100
 
 # SIMULATION PARAMETERS
 stochastic: true
@@ -93,13 +96,9 @@ evs:
 
 # METRICS/RESULTS
 # walras_tax: true
-# vcg: true
+vcg: true
 
 plots:
-  #- total_cost_vs_energy_cost
   - soc_evolution
   - market_prices
-  # - total_cost_bars
-  # - payment_comparison
-  # - total_cost_benchmarking
-  - v2g_fraction
+  - vcg_tax_violin

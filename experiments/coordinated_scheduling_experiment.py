@@ -3,6 +3,7 @@ from copy import copy
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB, Model
+import time
 
 # Import our base experiment & generic ADMM solver
 from experiments.base_experiment import BaseExperiment
@@ -14,6 +15,15 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
     Implements a Coupled Coordinated Scheduling approach with ADMM,
     enforcing a global constraint on the sum of absolute (charge/discharge).
     """
+    def __init__(self, config):
+        super().__init__(config)
+        self.warmstart_solutions = None
+
+    def apply_warmstart(self, warmstart_dict):
+        """
+        warmstart_dict: { ev_id -> list of length T with power values }
+        """
+        self.warmstart_solutions = warmstart_dict
 
     def run(self):
         """
@@ -39,6 +49,12 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             "t_actual": np.zeros(len(evs), dtype=float),
             "dual": np.zeros(T),  # dual variable for the global constraint
         }
+        if self.warmstart_solutions is not None:
+            for i, ev in enumerate(evs):
+                ev_id = ev["id"]
+                # Only fill for that EV if present
+                if ev_id in self.warmstart_solutions:
+                    iteration_state["u"][i,:] = self.warmstart_solutions[ev_id]
 
         # 3) Build an ADMM instance
         self.admm_solver = ADMM(
@@ -55,10 +71,16 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         self.admm_solver.old_iteration_state = copy(iteration_state) # shallow copy
 
         # 4) Solve
+        start_t = time.time()
         final_state = self.admm_solver.solve()
+        solve_time = time.time() - start_t
+        logging.info(f"Coordinated scheduling took {solve_time:.2f} seconds.")
 
         # 5) Aggregate results (costs, SoC, etc.)
         self._postprocess_results(evs, T, market_prices, final_state, start_time, granularity)
+        self.results["admm_iterations"] = self.admm_solver.iter_count
+        self.results["nu_multiplier"] = self.config["nu_multiplier"]
+        self.results["admm_solve_time"] = solve_time
 
         return self.results
 
@@ -268,6 +290,8 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             "desired_disconnection_time": desired_disconnection_time,
             "actual_disconnection_time": actual_disconnection_time,
             "v2g_fraction": v2g_fraction,
+            "u": final_state["u"].tolist(),
+            "t_actual": final_state["t_actual"].tolist()
         }
 
         # 5) If walras_tax is enabled, compute additional metrics
