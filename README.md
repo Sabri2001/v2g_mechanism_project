@@ -37,7 +37,7 @@ conda activate v2g-mechanism
 ### Running Experiments
 ```
 # Basic experiment execution
-python main.py --config configs/default.yaml
+python main.py --config configs/config.yaml
 ```
 
 ## Results
