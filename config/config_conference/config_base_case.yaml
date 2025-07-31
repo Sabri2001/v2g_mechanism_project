@@ -1,11 +1,11 @@
 # To run with main.py
 
 # NAME XP
-folder: "final/real_data_soc"
-name_xp: "base_case" # limit_10, battery_factor_0_25, california
+folder: "conference"
+name_xp: "base_case" # limit_15, battery_factor_1, california
 
 # EXPERIMENT TYPE
-experiment_types: ["coordinated"]
+experiment_types: ["coordinated", "uncoordinated"]
   # "uncoordinated" or "coordinated" or "inelastic_coordinated" or "unidirectional_coordinated" or "centralized"
 
 
@@ -21,8 +21,7 @@ max_iter: 100
 stochastic: false
 time_range: [10, 22]  # Time from 10 AM to 10 PM
 seed: 42
-market_prices: [141.93,134.66,131.39,132.57,138.1,151.38,144.9,223.78,198.09,171.76,168.51,156.74] # Jan. 16, in $/MWh, 7 AM to 12 AM
-# market_prices: [40.12, 42.28, 43.46, 46.59, 60.65, 65.67, 70.41, 85.57, 142.20, 248.21, 116.28, 82.23] # July 12, in $/MWh, 10 AM to 10 PM, California
+market_prices: [40.12, 42.28, 43.46, 46.59, 60.65, 65.67, 70.41, 85.57, 142.20, 248.21, 116.28, 82.23] # July 12, in $/MWh, 10 AM to 10 PM, California
 granularity: 4
 market_prices_csv: "C:/Users/sabri/Projects/v2g_mechanism_project/data/processed/day_ahead_prices/hub_prices.csv"
 evcs_power_limit: 15
@@ -38,67 +37,66 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
+    max_charge_rate: 6.6
     max_discharge_rate: 6.6 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13 # for Nissan Leaf 0.13
-    disconnection_time_flexibility: 62 # 5c for delaying by 1h
+    disconnection_time_flexibility: 62 # ~30$ for delaying by 1h
     soc_flexibility: 10
     energy_efficiency: 0.87
   - id: 1
-    disconnection_time: 18 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 18
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
-    min_soc: 15 # equal to initial_soc
+    max_charge_rate: 6.6
+    max_discharge_rate: 6.6
+    min_soc: 15 
     battery_wear_cost_coefficient: 0.13
-    disconnection_time_flexibility: 60
+    disconnection_time_flexibility: 30
     soc_flexibility: 10
     energy_efficiency: 0.87
   - id: 2
-    disconnection_time: 19 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 19
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
-    min_soc: 15 # equal to initial_soc
+    max_charge_rate: 6.6 
+    max_discharge_rate: 6.6
+    min_soc: 15
+    battery_wear_cost_coefficient: 0.13
+    disconnection_time_flexibility: 52
+    soc_flexibility: 10
+    energy_efficiency: 0.87
+  - id: 3
+    disconnection_time: 20 
+    battery_capacity: 40
+    initial_soc: 15
+    desired_soc: 35
+    max_charge_rate: 6.6 
+    max_discharge_rate: 6.6 
+    min_soc: 15
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 54
     soc_flexibility: 10
     energy_efficiency: 0.87
-  - id: 3
-    disconnection_time: 20 # should be between time_range[0]+1 and time_range[1] (included)
-    battery_capacity: 40
-    initial_soc: 15
-    desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
-    min_soc: 15 # equal to initial_soc
-    battery_wear_cost_coefficient: 0.13
-    disconnection_time_flexibility: 59
-    soc_flexibility: 10
-    energy_efficiency: 0.87
   - id: 4
-    disconnection_time: 19 # should be between time_range[0]+1 and time_range[1] (included)
+    disconnection_time: 19 
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
-    min_soc: 15 # equal to initial_soc
+    max_charge_rate: 6.6
+    max_discharge_rate: 6.6 
+    min_soc: 15 
     battery_wear_cost_coefficient: 0.13
-    disconnection_time_flexibility: 58
+    disconnection_time_flexibility: 29
     soc_flexibility: 10
     energy_efficiency: 0.87
 
-# METRICS/RESULTS
-# walras_tax: true
-# vcg: true
+vcg: true
 
 plots:
   - soc_evolution
   - market_prices
-  - v2g_fraction
+  - ev_total_cost_comparison
+  - vcg_vs_disconnection_time

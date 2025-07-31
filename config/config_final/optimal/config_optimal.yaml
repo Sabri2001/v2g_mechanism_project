@@ -222,5 +222,6 @@ plots:
   - total_cost_vs_energy_cost
   - soc_evolution
   - market_prices
-  - gap_violin
+  # - gap_violin
+  - gap_distribution
   

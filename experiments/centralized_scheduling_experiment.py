@@ -36,7 +36,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         
         # Create the full model and suppress solver output.
         model = gp.Model("CentralizedScheduling")
-        model.setParam("OutputFlag", 0)
+        model.setParam("OutputFlag", 1)
         
         # 2) Create decision variables for each EV
         # We will store each EV's variables in a dictionary keyed by its id.
@@ -78,7 +78,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             # Then also set model.params.AdvBasis = 1 if Gurobi version requires it:
             model.update()
         
-        # 3) Add global constraints: For each time period t, the sum over EVs of abs_u must not exceed the EVCS power limit.
+        # 3) Add global constraints: For each time period t, the abs of the sum over EVs of u must not exceed the EVCS power limit.
         global_constraints = {}
         global_abs = {}
         for t in range(T):

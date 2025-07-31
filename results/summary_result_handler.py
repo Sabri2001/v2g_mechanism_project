@@ -76,10 +76,35 @@ class SummaryResultHandler:
         Args:
             plots (List[str]): List of requested plot identifiers, e.g. ["total_cost_bars", "v2g_fraction"].
         """
+        if "vcg_tax_bar" in plots:
+            output_path = os.path.join(self.base_output_dir, "vcg_tax_bar.png")
+            PlotHandler.plot_vcg_tax_bar(self.results_by_experiment, output_path)
+            logging.info(f"VCG tax bar plot saved to {output_path}")
+
+        if "vcg_vs_disconnection_time" in plots:
+            output_path = os.path.join(self.base_output_dir, "vcg_vs_disconnection_time.png")
+            PlotHandler.plot_vcg_vs_disconnection_time(self.results_by_experiment, output_path)
+            logging.info(f"VCG vs disconnection time plot saved to {output_path}")
+
+        if "vcg_vs_flexibility" in plots:
+            output_path = os.path.join(self.base_output_dir, "vcg_vs_flexibility.png")
+            PlotHandler.plot_vcg_vs_flexibility(self.results_by_experiment, output_path)
+            logging.info(f"VCG vs flexibility plot saved to {output_path}")
+
+        if "ev_total_cost_comparison" in plots:
+            output_path = os.path.join(self.base_output_dir, "ev_total_cost_comparison.png")
+            PlotHandler.plot_ev_total_cost_comparison(self.results_by_experiment, output_path)
+            logging.info(f"EV total cost comparison plot saved to {output_path}")
+
         if "admm_iterations_violin" in plots:
             output_path = os.path.join(self.base_output_dir, "admm_iterations_violin.png")
             PlotHandler.plot_admm_iterations_violin(self.results_by_experiment, output_path)
             logging.info(f"ADMM iterations violin plot saved to {output_path}")
+
+        if "vcg_tax_distribution" in plots:
+            output_path = os.path.join(self.base_output_dir, "vcg_tax_distribution.png")
+            PlotHandler.plot_vcg_tax_distribution(self.results_by_experiment, output_path)
+            logging.info(f"VCG tax distribution plot saved to {output_path}")
 
         if "vcg_tax_violin" in plots:
             output_path = os.path.join(self.base_output_dir, "vcg_tax_violin.png")
@@ -90,6 +115,11 @@ class SummaryResultHandler:
             output_path = os.path.join(self.base_output_dir, "gap_violin.png")
             PlotHandler.plot_gap_violin(self.results_by_experiment, output_path)
             logging.info(f"Gap violin saved to {output_path}") 
+
+        if "gap_distribution" in plots:
+            output_path = os.path.join(self.base_output_dir, "gap_distribution.png")
+            PlotHandler.plot_gap_distribution(self.results_by_experiment, output_path)
+            logging.info(f"Gap distribution saved to {output_path}") 
 
         if "gap_swarm" in plots:
             output_path = os.path.join(self.base_output_dir, "gap_swarm.png")

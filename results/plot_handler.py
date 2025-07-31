@@ -37,6 +37,7 @@ class PlotHandler:
 
     @staticmethod
     def plot_soc_evolution(schedule_results, time_axis, output_path, ev_config):
+        import matplotlib.ticker as ticker
         sns.set(style="whitegrid")
         ev_ids = list(schedule_results["soc_over_time"].keys())
         num_evs = len(ev_ids)
@@ -74,27 +75,28 @@ class PlotHandler:
             # Desired / actual disconnection lines
             desired_time = schedule_results["desired_disconnection_time"][ev_id]
             actual_time = schedule_results["actual_disconnection_time"][ev_id]
-            ax.axvline(desired_time, color='magenta', linewidth=4, linestyle='-',
+            offset = 0.05  # adjust as needed based on time scale resolution
+            ax.axvline(desired_time - offset, color='magenta', linewidth=4, linestyle='-',
                     label='Desired Disconnection')
-            ax.axvline(actual_time, color='darkblue', linewidth=4, linestyle='-',
+            ax.axvline(actual_time + offset, color='darkblue', linewidth=4, linestyle='-',
                     label='Actual Disconnection')
 
-            # Hide y‐axis ticks and label each row with EV ID
+            # Hide y-axis ticks and label each row with EV ID
             ax.set_yticks([])
-            ax.set_ylabel(str(ev_id), rotation=0, labelpad=15, fontsize=12,
+            ax.set_ylabel(str(ev_id + 1), rotation=0, labelpad=15, fontsize=30,
                         ha='center', va='center')
             ax.set_xlim(time_axis[0], time_axis[-1])
 
-        # Label the shared x axis
-        plt.xlabel("Time", fontsize=14, labelpad=25)
+        # Label the shared x-axis with "Time (h)" and increased font size
+        plt.xlabel("Time (h)", fontsize=30, labelpad=30)
         for ax in axes:
             ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+            # Format hours as two-digit numbers (e.g., "10") without ":00"
             ax.xaxis.set_major_formatter(
-                ticker.FuncFormatter(lambda x, pos: f"{int(x)}:00")
+                ticker.FuncFormatter(lambda x, pos: f"{int(x):02d}")
             )
+            ax.tick_params(axis='x', labelsize=30)
 
-        # Adjust layout to leave room on the right for the colorbar,
-        # and some space at the bottom for the legend
         fig.subplots_adjust(left=0.12,
                             right=0.84,
                             bottom=0.15,
@@ -109,21 +111,22 @@ class PlotHandler:
             pad=0.07,
             shrink=0.8
         )
-        cbar.set_label('State of Charge (%)', fontsize=10)
+        cbar.set_label('State of Charge (%)', fontsize=30)
         cbar.set_ticks([0, 1])
         cbar.set_ticklabels(['0 %', '100 %'])
+        cbar.ax.tick_params(labelsize=30)
 
-        # EVs label slightly further from plots (tweak x position)
-        fig.text(0.05, 0.55, 'EVs', va='center', rotation='vertical', fontsize=14)
+        # EVs label slightly further from plots
+        fig.text(0.05, 0.55, 'EVs', va='center', rotation='vertical', fontsize=30)
 
-        # Retrieve the line handles for desired/actual and place legend below
+        # Retrieve the line handles for desired/actual and place legend further below the plot
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(
             handles, labels,
             loc='lower center',
-            bbox_to_anchor=(0.45, -0.05),
+            bbox_to_anchor=(0.45, -0.20),
             ncol=2,
-            fontsize=10
+            fontsize=30
         )
 
         plt.savefig(output_path, bbox_inches='tight')
@@ -134,31 +137,24 @@ class PlotHandler:
     def plot_market_prices(market_prices, time_range, output_path):
         """
         Plot the day-ahead market prices in $/MWh for each hour of the specified time range.
-
-        Args:
-            market_prices (list): List of market prices corresponding to each hour in the time range.
-            time_range (list): List with start and end hours [start, end].
-            output_path (str): Path to save the output plot.
         """
         sns.set(style="whitegrid")
         hours = list(range(time_range[0], time_range[1]))  # Generate the time axis based on the time range
 
-        # Ensure the lengths of market_prices and hours match
         if len(market_prices) != len(hours):
             raise ValueError("Length of market_prices does not match the length of the time range.")
 
-        # Create the plot
         plt.figure(figsize=(10, 5))
         plt.plot(hours, market_prices, marker='o', linestyle='-', color='tab:blue')
 
         # Customize the plot
-        plt.title("Day-Ahead Market Prices", fontsize=14)
-        plt.xlabel("Hour of Day", fontsize=12)
-        plt.ylabel("Price ($/kWh)", fontsize=12)
-        plt.xticks(hours)
+        # (Title removed as requested)
+        plt.xlabel("Hour of Day", fontsize=15, labelpad=20)  # increased fontsize and labelpad
+        plt.ylabel("Price ($/kWh)", fontsize=15, labelpad=20)
+        plt.xticks(hours, fontsize=15)  # enlarged tick labels
+        plt.yticks(fontsize=15)
         plt.grid(True, linestyle='--', linewidth=0.5)
 
-        # Save the plot
         plt.tight_layout()
         plt.savefig(output_path)
         plt.close()
@@ -298,6 +294,49 @@ class PlotHandler:
         logging.info(f"Violin plot of gaps saved to {output_path}")
 
     @staticmethod
+    def plot_gap_distribution(results_by_experiment, output_path):
+        """
+        Compute the percentage gap between ADMM and Optimal solutions,
+        and display it as an empirical distribution plot (histogram) across all experiment runs.
+
+        Args:
+            results_by_experiment (dict): Dict of lists of run results.
+            output_path (str): Path to save the output plot.
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import logging
+
+        sns.set(style="whitegrid")
+
+        admm_costs = [run["sum_operator_costs"] for run in results_by_experiment["coordinated"]]
+        opt_costs = [run["sum_operator_costs"] for run in results_by_experiment["centralized"]]
+
+        gaps = []
+        for admm, opt in zip(admm_costs, opt_costs):
+            gap = 0.0 if opt == 0 else 100.0 * (admm - opt) / opt
+            gaps.append(gap)
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        # Plot the empirical distribution as a histogram (bars without smoothing)
+        ax.hist(gaps, bins=20, edgecolor='black')
+
+        # Vertical line at gap = 0%
+        ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
+
+        # Increase font size for the axis labels.
+        ax.set_xlabel("Gap (%)", labelpad=15, fontsize=15)
+        ax.set_ylabel("Count", labelpad=15, fontsize=15)
+        
+        # Increase font size for tick labels.
+        ax.tick_params(axis='both', which='major', labelsize=15)
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Histogram of gaps saved to {output_path}")
+
+    @staticmethod
     def plot_cost_benchmarking_bars(results_by_experiment, output_path):
         """
         Plot a bar chart showing the percentage change in total_cost
@@ -316,7 +355,7 @@ class PlotHandler:
 
         # Extract uncoordinated results
         uncoord_results = results_by_experiment["uncoordinated"]
-        uncoord_costs = [res["sum_operator_cost"] for res in uncoord_results]
+        uncoord_costs = [res["sum_operator_costs"] for res in uncoord_results]
         mean_uncoord = np.mean(uncoord_costs)
 
         if mean_uncoord == 0:
@@ -330,7 +369,7 @@ class PlotHandler:
 
         for xp_type in experiment_types:
             xp_results = results_by_experiment[xp_type]
-            xp_costs = [res["sum_operator_cost"] for res in xp_results]
+            xp_costs = [res["sum_operator_costs"] for res in xp_results]
 
             if not xp_costs:
                 logging.warning(f"No results for experiment type '{xp_type}'. Skipping.")
@@ -530,24 +569,48 @@ class PlotHandler:
         - alpha_values (y-axis): candidate disconnection_time_flexibility bids.
         - cost_grid: a 2D array (shape: len(alpha_values) x len(tau_values))
         where each cell is the EV's utility computed as energy_cost + congestion_cost + adaptability_cost.
-        - If true_tau and true_alpha are provided, the cell matching these values is highlighted with a thick blue border.
-        The colormap runs from green (low cost) to red (high cost).
+        - If true_tau and true_alpha are provided, the cell matching these values is highlighted 
+        with a thick blue border. The colormap runs from green (low cost) to red (high cost).
         """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from matplotlib.patches import Rectangle
+        import logging
+
+        # Set the overall style for the plot.
         sns.set(style="whitegrid")
         plt.figure(figsize=(8, 6))
+
         # Use the reversed RdYlGn colormap so that low values are green and high values are red.
         cmap = "RdYlGn_r"
-        ax = sns.heatmap(cost_grid, xticklabels=tau_values, yticklabels=alpha_values, cmap=cmap, annot=True, fmt=".2f")
-        plt.xlabel("Bid: disconnection time", labelpad=15)  # Increased labelpad for x-axis
-        plt.ylabel("Bid: adaptability coefficient", labelpad=15)  # Increased labelpad for y-axis
-        # plt.title("Cost of Target EV as a Function of its Bid")
+        ax = sns.heatmap(
+            cost_grid,
+            xticklabels=tau_values,
+            yticklabels=alpha_values,
+            cmap=cmap,
+            annot=True,
+            fmt=".2f"
+        )
+
+        # Increase font size for the axis labels.
+        plt.xlabel("Bid: disconnection time (h)", labelpad=15, fontsize=15)
+        plt.ylabel("Bid: flexibility coefficient ($/h²)", labelpad=15, fontsize=15)
         
+        # Increase font size for tick labels.
+        ax.tick_params(axis='both', which='major', labelsize=15)
+
+        # Increase font size for the colorbar ticks.
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=15)
+        
+        # Add a legend for the color bar with increased label distance.
+        cbar.set_label("Utility ($)", fontsize=15, labelpad=15)
+
         # If true_tau and true_alpha are provided, highlight that cell.
         if true_tau is not None and true_alpha is not None:
             try:
                 col_index = tau_values.index(true_tau)
                 row_index = alpha_values.index(true_alpha)
-                # The heatmap's coordinate system: each cell is 1 unit. Add a Rectangle patch.
                 rect = Rectangle((col_index, row_index), 1, 1, fill=False, edgecolor='blue', lw=3)
                 ax.add_patch(rect)
             except ValueError:
@@ -657,13 +720,16 @@ class PlotHandler:
             )
 
         ax.set_xticks(x)
-        ax.set_xticklabels(xp_labels, fontsize=10)
+        ax.set_xticklabels(xp_labels, fontsize=15)
+        ax.tick_params(axis='y', labelsize=15)
 
         # Increase labelpad for more spacing to the axes
-        ax.set_xlabel("Experiment Setup", fontsize=12, labelpad=15)
-        ax.set_ylabel("Total Cost ($)", fontsize=12, labelpad=15)
+        ax.set_xlabel("Experiment Setup", fontsize=15, labelpad=20)
+        ax.set_ylabel("Total Cost ($)", fontsize=15, labelpad=20)
 
-        ax.legend(title="Battery Factor")
+        # Create the legend and ensure all its elements are fontsize 15
+        legend = ax.legend(title="Battery Factor", fontsize=15)
+        legend.get_title().set_fontsize(15)
 
         fig.tight_layout()
         plt.savefig(output_path)
@@ -675,7 +741,7 @@ class PlotHandler:
     @staticmethod
     def plot_fake_alpha_tau_bars(chart_data, output_path):
         """
-        Bar chart with 3 bars (one for each scenario),
+        Bar chart with bars (one for each scenario),
         plus std error bars from the run-to-run variation.
         """
         import matplotlib.pyplot as plt
@@ -709,22 +775,31 @@ class PlotHandler:
             alpha=0.7
         )
         ax.set_xticks(x_positions)
-        ax.set_xticklabels(xp_labels, fontsize=10)
-        ax.set_xlabel("Scenario", fontsize=12, labelpad=10)
-        ax.set_ylabel("Total Cost ($)", fontsize=12, labelpad=10)
+        ax.set_xticklabels(xp_labels, fontsize=15)
+        ax.set_xlabel("Scenario", fontsize=15, labelpad=15)
+        ax.set_ylabel("Total Cost ($)", fontsize=15, labelpad=15)
+        
+        # Set tick label sizes for both axes
+        ax.tick_params(axis='both', which='major', labelsize=15)
 
+        
         fig.tight_layout()
         plt.savefig(output_path)
         plt.close()
 
-        import logging
         logging.info(f"Plot 'fake_alpha_tau_bars' saved to {output_path}")
 
     @staticmethod
     def plot_admm_iterations_violin(results_by_experiment, output_path):
         """
-        Produces a horizontal violin plot of the ADMM iteration counts
-        for the 'coordinated' experiment, separated by nu_multiplier (1.0 vs 1.1).
+        Produces a vertical violin plot of the ADMM iteration counts
+        for the 'coordinated' experiment, separated by nu_multiplier.
+        nu_multiplier = 1.0 is renamed "Constant" (blue) and
+        nu_multiplier = 1.1 is renamed "Adaptive" (orange).
+        
+        Args:
+            results_by_experiment (dict): Dict of lists of run results.
+            output_path (str): Path to save the output plot.
         """
         import matplotlib.pyplot as plt
         import seaborn as sns
@@ -732,12 +807,10 @@ class PlotHandler:
         import logging
 
         coordinated_runs = results_by_experiment.get("coordinated", [])
-
         data_rows = []
         for run_results in coordinated_runs:
             iters = run_results.get("admm_iterations", None)
             nu_mult = run_results.get("nu_multiplier", None)
-
             if iters is not None and nu_mult is not None and nu_mult in [1.0, 1.1]:
                 data_rows.append({
                     "nu_multiplier": nu_mult,
@@ -749,28 +822,34 @@ class PlotHandler:
             return
 
         df = pd.DataFrame(data_rows)
-
+        
+        # Replace numeric nu_multiplier values with desired string labels.
+        mapping = {1.0: "Constant", 1.1: "Adaptive"}
+        df["nu_multiplier"] = df["nu_multiplier"].replace(mapping)
+        
         sns.set(style="whitegrid")
         fig, ax = plt.subplots(figsize=(8, 5))
-
+        
+        # Define a custom palette: blue for Constant, orange for Adaptive.
+        palette = {"Constant": "blue", "Adaptive": "orange"}
+        
         sns.violinplot(
             data=df,
-            y="nu_multiplier",
-            x="admm_iterations",
-            orient="h",
+            x="nu_multiplier",
+            y="admm_iterations",
             cut=0,
+            palette=palette,
             ax=ax
         )
-
-        # Increased padding around axis labels
-        ax.set_xlabel("ADMM Iterations", fontsize=12, labelpad=15)
-        ax.set_ylabel("nu_multiplier", fontsize=12, labelpad=15)
-        # ax.set_title(...) removed as requested
+        
+        # Remove the x-axis label (tick labels now show "Constant" and "Adaptive")
+        ax.set_xlabel("", fontsize=12, labelpad=15)
+        ax.set_ylabel("ADMM Iterations", fontsize=12, labelpad=15)
 
         plt.tight_layout()
         plt.savefig(output_path)
         plt.close()
-        logging.info(f"Plot 'admm_iterations_violin' saved to {output_path}")
+        logging.info(f"Vertical violin plot of ADMM iterations saved to {output_path}")
 
     @staticmethod
     def plot_vcg_tax_violin(results_by_experiment, output_path):
@@ -857,6 +936,62 @@ class PlotHandler:
         logging.info(f"Plot 'vcg_tax_violin' saved to {output_path}")
 
     @staticmethod
+    def plot_vcg_tax_distribution(results_by_experiment, output_path):
+        """
+        Creates an empirical distribution plot (histogram) for total VCG taxes
+        (as a percentage of total energy costs) across all runs/experiment types.
+        A vertical line is drawn at zero and another at the mean value.
+        
+        Args:
+            results_by_experiment (dict): Dict of lists of run results.
+            output_path (str): Path to save the output plot.
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import numpy as np
+        import logging
+
+        # Collect VCG tax percentages
+        vcg_tax_percentages = []
+        for xp_type, runs_list in results_by_experiment.items():
+            for run_results in runs_list:
+                if "vcg_tax" in run_results:
+                    total_vcg_tax = sum(run_results["vcg_tax"].values())
+                    total_energy_cost = run_results.get("sum_energy_costs", 0.0)
+                    if total_energy_cost != 0.0:
+                        pct = (total_vcg_tax / total_energy_cost) * 100
+                        vcg_tax_percentages.append(pct)
+                    else:
+                        logging.warning("Total energy cost is zero; skipping run.")
+
+        if not vcg_tax_percentages:
+            logging.warning("No VCG tax data found. Skipping 'plot_vcg_tax_distribution'.")
+            return
+
+        sns.set(style="whitegrid")
+        fig, ax = plt.subplots(figsize=(8, 5))
+
+        # Plot histogram (empirical distribution plot)
+        ax.hist(vcg_tax_percentages, bins=200, edgecolor='black')
+
+        # Add vertical reference line at zero
+        ax.axvline(x=0, color="red", linestyle="--", linewidth=3)
+        
+        # Compute and add vertical reference line for the mean
+        mean_val = np.mean(vcg_tax_percentages)
+        ax.axvline(x=mean_val, color="orange", linestyle="-", linewidth=3, label=f"Mean = {mean_val:.2f}")
+        ax.legend()
+
+        # Set axis labels
+        ax.set_xlabel("VCG Tax (% of Energy Costs)", fontsize=12, labelpad=20)
+        ax.set_ylabel("Frequency", fontsize=12, labelpad=15)
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Plot 'plot_vcg_tax_distribution' saved to {output_path}")
+
+    @staticmethod
     def plot_warmstart(times_dict, output_path):
         """
         Creates a boxplot of partial scheduling times
@@ -893,137 +1028,238 @@ class PlotHandler:
             ax=ax
         )
 
-        # Labels and padding
-        ax.set_xlabel("Method", fontsize=12, labelpad=15)
-        ax.set_ylabel("Computation Time (s)", fontsize=12, labelpad=15)
+        # Set x and y axis labels with fontsize 15 and adjusted label padding.
+        ax.set_xlabel("Method", fontsize=15, labelpad=15)
+        ax.set_ylabel("Computation Time (s)", fontsize=15, labelpad=15)
 
-        # Logarithmic y-axis
+        # Set y-axis to logarithmic scale.
         ax.set_yscale("log")
 
-        ax.legend(title="")
+        # Set tick labels for both axes to fontsize 15.
+        ax.tick_params(axis='both', which='major', labelsize=15)
+
+        # Update legend with fontsize 15.
+        legend = ax.legend(title="", fontsize=15)
+        # If needed, update legend title font size:
+        # legend.get_title().set_fontsize(15)
 
         plt.tight_layout()
         plt.savefig(output_path)
         plt.close()
 
-    # @staticmethod
-    # def plot_warmstart(times_dict, output_path):
-    #     """
-    #     Creates a grouped bar chart (mean ± std) of partial scheduling times
-    #     for ADMM vs. Gurobi, comparing No Warmstart vs. Warmstart.
-        
-    #     times_dict keys:
-    #     - "coord_no_ws": ADMM partial no-warmstart times
-    #     - "coord_ws": ADMM partial warmstart times
-    #     - "cent_no_ws": Gurobi partial no-warmstart times
-    #     - "cent_ws": Gurobi partial warmstart times
-    #     """
-    #     import matplotlib.pyplot as plt
-    #     import numpy as np
-    #     import seaborn as sns
+    @staticmethod
+    def plot_ev_total_cost_comparison(results_by_experiment, output_path):
+        """
+        Plot per-EV total cost comparison:
+        - uncoordinated: individual_cost + individual_payment (orange)
+        - coordinated: individual_cost + vcg_tax (blue)
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import numpy as np
+        import logging
 
-    #     sns.set(style="whitegrid")
+        sns.set(style="whitegrid")
 
-    #     # Means and stds
-    #     coord_no_ws_mean = np.mean(times_dict["coord_no_ws"])
-    #     coord_no_ws_std  = np.std(times_dict["coord_no_ws"])
-    #     coord_ws_mean    = np.mean(times_dict["coord_ws"])
-    #     coord_ws_std     = np.std(times_dict["coord_ws"])
+        if "uncoordinated" not in results_by_experiment or "coordinated" not in results_by_experiment:
+            raise ValueError("Both 'uncoordinated' and 'coordinated' experiments must be available.")
 
-    #     cent_no_ws_mean = np.mean(times_dict["cent_no_ws"])
-    #     cent_no_ws_std  = np.std(times_dict["cent_no_ws"])
-    #     cent_ws_mean    = np.mean(times_dict["cent_ws"])
-    #     cent_ws_std     = np.std(times_dict["cent_ws"])
+        uncoord_result = results_by_experiment["uncoordinated"][0]
+        coord_result = results_by_experiment["coordinated"][0]
 
-    #     # Two categories on the x-axis: 0 -> ADMM, 1 -> Gurobi
-    #     x = np.arange(2)
-    #     width = 0.35
+        ev_ids = list(uncoord_result["individual_cost"].keys())
+        ev_indices = list(range(1, len(ev_ids) + 1))
 
-    #     # We define arrays for No Warmstart and Warmstart
-    #     no_ws_means = [coord_no_ws_mean, cent_no_ws_mean]
-    #     no_ws_stds  = [coord_no_ws_std,  cent_no_ws_std]
-    #     ws_means    = [coord_ws_mean,    cent_ws_mean]
-    #     ws_stds     = [coord_ws_std,     cent_ws_std]
+        uncoord_costs = [
+            uncoord_result["individual_cost"][ev_id] + uncoord_result["individual_payment"][ev_id]
+            for ev_id in ev_ids
+        ]
+        coord_costs = [
+            coord_result["individual_cost"][ev_id] + coord_result["vcg_tax"][ev_id]
+            for ev_id in ev_ids
+        ]
 
-    #     fig, ax = plt.subplots(figsize=(8, 5))
+        bar_width = 0.35
+        x = np.arange(len(ev_ids))
 
-    #     # Plot No Warmstart bars (shift left)
-    #     ax.bar(
-    #         x - width/2, no_ws_means, width,
-    #         yerr=no_ws_stds, capsize=5,
-    #         alpha=0.8, label="No Warmstart"
-    #     )
+        fig, ax = plt.subplots(figsize=(max(10, len(ev_ids)*0.5), 6))
 
-    #     # Plot Warmstart bars (shift right)
-    #     ax.bar(
-    #         x + width/2, ws_means, width,
-    #         yerr=ws_stds, capsize=5,
-    #         alpha=0.8, label="Warmstart"
-    #     )
+        ax.bar(x - bar_width/2, uncoord_costs, width=bar_width, color="orange", label="Uncoordinated")
+        ax.bar(x + bar_width/2, coord_costs, width=bar_width, color="blue", label="Coordinated")
 
-    #     # X-axis labels
-    #     ax.set_xticks(x)
-    #     ax.set_xticklabels(["ADMM", "Gurobi"], fontsize=11)
+        ax.set_xticks(x)
+        ax.set_xticklabels([str(i) for i in ev_indices])
+        ax.set_xlabel("EV Index", fontsize=12, labelpad=15)  # More padding
+        ax.set_ylabel("Total Cost ($)", fontsize=12, labelpad=20)  # More padding
 
-    #     ax.set_ylabel("Computation Time (s)", fontsize=12)
-    #     ax.set_title("Partial Scheduling: No Warmstart vs. Warmstart", fontsize=13)
+        ax.legend()
+        plt.subplots_adjust(bottom=0.2)  # Extra bottom space for x-labels
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Per-EV total cost comparison plot saved to {output_path}")
 
-    #     ax.legend(fontsize=10)
+    @staticmethod
+    def plot_vcg_vs_flexibility(results_by_experiment, output_path):
+        """
+        Scatter plot of VCG tax vs time flexibility coefficient per EV (from coordinated xp),
+        with EV indices (+1) labeled next to each point, with increased spacing and regression line.
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import logging
 
-    #     plt.tight_layout()
-    #     plt.savefig(output_path)
-    #     plt.close()
+        xp_type = "coordinated"
+        if xp_type not in results_by_experiment:
+            logging.warning("No coordinated experiment data available for VCG vs flexibility plot.")
+            return
 
-    # @staticmethod
-    # def plot_vcg_tax_violin(results_by_experiment, output_path):
-        # """
-        # Creates a violin plot of total VCG taxes as a percentage of total energy costs,
-        # for all runs (across all experiment types) in a single distribution.
-        
-        # The percentage is computed as:
-        #     100 * ( sum of all EVs' vcg_tax ) / ( sum_energy_costs ).
-        # """
-        # import matplotlib.pyplot as plt
-        # import seaborn as sns
-        # import numpy as np
-        # import logging
+        vcg_values = []
+        flex_coeffs = []
+        labels = []
 
-        # # Gather VCG tax % data from all experiment types (if present).
-        # vcg_tax_percentages = []
-        # for xp_type, runs_list in results_by_experiment.items():
-        #     for run_results in runs_list:
-        #         # Only consider runs that actually have vcg_tax computed
-        #         if "vcg_tax" in run_results:
-        #             total_vcg_tax = sum(run_results["vcg_tax"].values())
-        #             print(f"Total VCG tax for run: {total_vcg_tax}")
-        #             total_energy_cost = run_results.get("sum_energy_costs", 0.0)
-        #             print(f"Total energy cost for run: {total_energy_cost}")
+        for result in results_by_experiment[xp_type]:
+            taxes = result.get("vcg_tax", {})
+            flexes = result.get("disconnection_time_flexibilities", {})
 
-        #             if total_energy_cost != 0.0:
-        #                 vcg_tax_pct = (total_vcg_tax / total_energy_cost) * 100
-        #                 vcg_tax_percentages.append(vcg_tax_pct)
-        #             else:
-        #                 print("Warning: Total energy cost is zero, skipping this run.")
-        #                 pass
+            sorted_ids = sorted(taxes.keys(), key=lambda x: int(x))  # Sort for consistency
 
-        # if not vcg_tax_percentages:
-        #     logging.warning("No VCG tax data found to plot. Skipping 'plot_vcg_tax_violin'.")
-        #     return
+            for ev_id in sorted_ids:
+                if ev_id in flexes:
+                    vcg_values.append(taxes[ev_id])
+                    flex_coeffs.append(flexes[ev_id])
+                    labels.append(f"EV{int(ev_id) + 1}")
 
-        # # Create a single violin plot, similarly to plot_gap_violin
-        # sns.set(style="whitegrid")
-        # fig, ax = plt.subplots(figsize=(8, 5))
+        if not vcg_values:
+            logging.warning("No VCG tax or flexibility data to plot.")
+            return
 
-        # # Plot horizontally with cut=0 to avoid extending tails
-        # sns.violinplot(x=vcg_tax_percentages, orient='h', cut=0, ax=ax)
-        
-        # # Optional vertical reference line at 0
-        # ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
+        plt.figure(figsize=(9, 7))
+        sns.set(style="whitegrid")
 
-        # ax.set_xlabel("VCG Tax (% of Energy Costs)", fontsize=12)
-        # # ax.set_title("Violin Plot: Distribution of VCG Taxes as % of Energy Costs", fontsize=14)
+        # Scatter + regression line
+        sns.regplot(x=flex_coeffs, y=vcg_values, scatter=True,
+                    fit_reg=True, ci=None, scatter_kws={"s": 100, "edgecolors": "black", "color": "blue"},
+                    line_kws={"color": "blue", "linewidth": 2, "linestyle": "--"})
 
-        # plt.tight_layout()
-        # plt.savefig(output_path)
-        # plt.close()
-        # logging.info(f"Plot 'vcg_tax_violin' saved to {output_path}")
+        # Annotate each point with label at offset
+        label_offset_x = 0.015 * (max(flex_coeffs) - min(flex_coeffs))
+        label_offset_y = 0.015 * (max(vcg_values) - min(vcg_values))
+        for x, y, label in zip(flex_coeffs, vcg_values, labels):
+            plt.text(x + label_offset_x, y + label_offset_y, label, fontsize=10, ha='left', va='bottom')
+
+        plt.xlabel("Inflexibility coefficient ($/h²)", fontsize=13, labelpad=20)
+        plt.ylabel("VCG Tax ($)", fontsize=13, labelpad=20)
+
+        plt.margins(x=0.3, y=0.3)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"VCG vs Flexibility plot saved to {output_path}")
+
+    @staticmethod
+    def plot_vcg_vs_disconnection_time(results_by_experiment, output_path):
+        """
+        Scatter plot of VCG tax vs desired disconnection time per EV (from coordinated xp),
+        with EV indices (+1) labeled next to each point, spaced clearly.
+        """
+        xp_type = "coordinated"
+        if xp_type not in results_by_experiment:
+            logging.warning("No coordinated experiment data available for VCG vs disconnection time plot.")
+            return
+
+        vcg_values = []
+        disconnect_times = []
+        labels = []
+
+        for result in results_by_experiment[xp_type]:
+            taxes = result.get("vcg_tax", {})
+            disconnect_list = result.get("desired_disconnection_time", [])
+
+            sorted_ids = sorted(taxes.keys(), key=lambda x: int(x))
+
+            for ev_id in sorted_ids:
+                idx = ev_id
+                if int(idx) < len(disconnect_list):
+                    vcg_values.append(taxes[ev_id])
+                    disconnect_times.append(disconnect_list[idx])
+                    labels.append(f"EV{int(idx)+1}")
+
+        if not vcg_values:
+            logging.warning("No VCG tax or disconnection time data to plot.")
+            return
+
+        plt.figure(figsize=(9, 7))
+        sns.set(style="whitegrid")
+
+        # Regression line
+        sns.regplot(
+            x=disconnect_times,
+            y=vcg_values,
+            scatter=True,
+            color="green",
+            ci =None,
+            line_kws={"linestyle": "--", "linewidth": 2},
+        )
+
+        # Scatter plot
+        plt.scatter(disconnect_times, vcg_values, s=100, alpha=0.8, edgecolors="black", color="green")
+
+        # Labels
+        offset_x = 0.015 * (max(disconnect_times) - min(disconnect_times))
+        offset_y = 0.015 * (max(vcg_values) - min(vcg_values))
+        for x, y, label in zip(disconnect_times, vcg_values, labels):
+            plt.text(x + offset_x, y + offset_y, label, fontsize=10, ha='left', va='bottom')
+
+        plt.xlabel("Desired Disconnection Time (h)", fontsize=13, labelpad=20)
+        plt.ylabel("VCG Tax ($)", fontsize=13, labelpad=20)
+        plt.margins(x=0.3, y=0.3)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"VCG vs Disconnection Time plot saved to {output_path}")
+
+    @staticmethod
+    def plot_vcg_tax_bar(results_by_experiment, output_path):
+        """
+        Bar chart of VCG tax per EV, showing positive and negative taxes clearly.
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import logging
+
+        xp_type = "coordinated"
+        if xp_type not in results_by_experiment:
+            logging.warning("No coordinated experiment data available for VCG tax bar plot.")
+            return
+
+        vcg_taxes = {}
+        for result in results_by_experiment[xp_type]:
+            vcg_taxes.update(result.get("vcg_tax", {}))
+
+        if not vcg_taxes:
+            logging.warning("No VCG tax data to plot.")
+            return
+
+        ev_ids = sorted(vcg_taxes.keys(), key=lambda x: int(x))
+        ev_indices = [int(i) + 1 for i in ev_ids]
+        tax_values = [vcg_taxes[i] for i in ev_ids]
+
+        # Color code: green for negative, blue for positive
+        colors = ["green" if val < 0 else "blue" for val in tax_values]
+
+        plt.figure(figsize=(max(10, len(ev_ids) * 0.6), 6))
+        sns.set(style="whitegrid")
+
+        bars = plt.bar(ev_indices, tax_values, color=colors, edgecolor="black")
+
+        # Add a horizontal line at y=0 for clarity
+        plt.axhline(0, color='black', linewidth=1)
+
+        plt.xlabel("EV Index", fontsize=13, labelpad=15)
+        plt.ylabel("VCG Tax ($)", fontsize=13, labelpad=15)
+        plt.xticks(ev_indices)
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"VCG tax bar plot saved to {output_path}")

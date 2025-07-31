@@ -3,7 +3,7 @@
 
 # NAME XP
 folder: "final/cost_savings"
-name_xp: "cost_savings_bars"
+name_xp: "cost_savings_bars_high_rates"
 
 # EXPERIMENT TYPE
 experiment_types: ["coordinated", "unidirectional_coordinated"]
@@ -39,8 +39,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2: 11.5, Nissan Leaf: 6.6
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2: 11.5, Nissan Leaf: 6.6
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13 # for Nissan Leaf 0.13
     disconnection_time_flexibility: 62 # 5c for delaying by 1h
@@ -51,8 +51,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 60
@@ -63,8 +63,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 54
@@ -75,8 +75,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 58
@@ -87,8 +87,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 50
@@ -99,8 +99,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13 # for Nissan Leaf 0.13
     disconnection_time_flexibility: 62 # 5c for delaying by 1h
@@ -111,8 +111,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 60
@@ -123,8 +123,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 54
@@ -135,8 +135,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 58
@@ -147,8 +147,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 50
@@ -159,8 +159,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13 # for Nissan Leaf 0.13
     disconnection_time_flexibility: 62 # 5c for delaying by 1h
@@ -171,8 +171,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 60
@@ -183,8 +183,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 54
@@ -195,8 +195,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 58
@@ -207,8 +207,8 @@ evs:
     battery_capacity: 40
     initial_soc: 15
     desired_soc: 35
-    max_charge_rate: 6.6 # Wallbox Quasar 2
-    max_discharge_rate: 6.6 # Nissan leaf limit
+    max_charge_rate: 13.5 # Wallbox Quasar 2
+    max_discharge_rate: 13.5 # Nissan leaf limit
     min_soc: 15 # equal to initial_soc
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 50

@@ -168,14 +168,14 @@ def main(config_path):
     xp_definitions = [
         ("Bid",  None,   None),   # no overrides
         ("No bid",       40.0,   None),   # override alpha
-        ("No time",      40.0,   17),   # override tau
+        # ("No time",      40.0,   17),   # override tau
     ]
 
     # We'll collect a list of cost values for each scenario
     chart_data = {
         "Bid":    [],
         "No bid":         [],
-        "No time":        []
+        # "No time":        []
     }
 
     # 4) Because we want random sampling, for each run we can re-instantiate a ConfigHandler

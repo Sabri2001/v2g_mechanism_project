@@ -77,7 +77,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         logging.info(f"Coordinated scheduling took {solve_time:.2f} seconds.")
 
         # 5) Aggregate results (costs, SoC, etc.)
-        self._postprocess_results(evs, T, market_prices, final_state, start_time, granularity)
+        self._postprocess_results(evs, T, market_prices, final_state, start_time, dt, granularity)
         self.results["admm_iterations"] = self.admm_solver.iter_count
         self.results["nu_multiplier"] = self.config["nu_multiplier"]
         self.results["admm_solve_time"] = solve_time
@@ -223,7 +223,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
     # Post-processing
     # -------------------------------------------------------------------------
 
-    def _postprocess_results(self, evs, T, market_prices, final_state, start_time, granularity):
+    def _postprocess_results(self, evs, T, market_prices, final_state, start_time, dt, granularity):
         """
         Builds aggregator-level cost vectors and SoC tracking from the final ADMM state.
         """
@@ -260,17 +260,17 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
 
             for i, ev in enumerate(evs):
                 u_it = final_state["u"][i, t]
-                cost_energy = market_prices[t//granularity] * u_it
+                cost_energy = market_prices[t//granularity] * u_it * dt
                 cost_wear = (ev["battery_wear_cost_coefficient"] *
                              abs(u_it) *
-                             ev["energy_efficiency"])
+                             ev["energy_efficiency"]) * dt
 
                 sum_op_cost_t += (cost_energy + cost_wear)
                 sum_energy_cost_t += cost_energy
 
                 # if u_it < 0, we have V2G
                 if u_it < 0:
-                    total_energy_transferred += -u_it
+                    total_energy_transferred += -u_it * dt
 
             operator_cost_vector[t] = sum_op_cost_t
             energy_cost_vector[t] = sum_energy_cost_t
@@ -304,7 +304,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
                 ev_id = ev["id"]
 
                 # Energy cost: sum over t of market_prices[t] * u[i,t]
-                energy_cost_ev = sum(market_prices[t//granularity] * final_state["u"][i, t] for t in range(T))
+                energy_cost_ev = sum(market_prices[t//granularity] * final_state["u"][i, t] for t in range(T)) * dt
                 energy_cost_dict[ev_id] = energy_cost_ev
 
                 # Adaptability cost: quadratic penalty on disconnect time deviation
@@ -312,7 +312,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
                 adaptability_cost_dict[ev_id] = adaptability_cost_ev    
 
                 # Congestion cost: extra cost due to dual variables ("Walras tax")
-                congestion_cost_ev = sum(dual[t] * final_state["u"][i, t] for t in range(T))
+                congestion_cost_ev = sum(dual[t] * final_state["u"][i, t] for t in range(T)) * dt
                 congestion_cost_dict[ev_id] = congestion_cost_ev
 
             # Add the new metrics to the results dictionary
@@ -320,29 +320,42 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
             self.results["adaptability_cost"] = adaptability_cost_dict
             self.results["congestion_cost"] = congestion_cost_dict
 
-        # 6) Compute individual costs
+        # 6) Compute individual costs (without payments)
         individual_cost = {}
         for i, ev in enumerate(evs):
             cost_i = 0.0
             for t in range(T):
                 # Energy cost and battery wear cost
-                cost_i += market_prices[t//granularity] * final_state["u"][i, t] \
-                        + ev["battery_wear_cost_coefficient"] * abs(final_state["u"][i, t]) * ev["energy_efficiency"]
+                cost_i +=  ev["battery_wear_cost_coefficient"] * abs(final_state["u"][i, t]) * ev["energy_efficiency"] * dt
             # Quadratic penalty on disconnection time deviation
             cost_i += 0.5 * ev["disconnection_time_flexibility"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
+            cost_i += 0.5 * ev["soc_flexibility"] * (ev["desired_soc"] - final_state["soc"][i, T]) ** 2
             individual_cost[ev["id"]] = cost_i
-
         # Store the per-EV cost breakdown in the results
         self.results["individual_cost"] = individual_cost
 
-        # 7) If vcg is enabled, compute additional metrics
+        # 7) Compute individual payments based on market prices
+        self.results["individual_payment"] = {}
+        for i, ev in enumerate(evs):
+            # Initialize the payment for this EV
+            individual_payment = 0.0
+            # Compute the payment as the sum of market prices multiplied by u[i,t]
+            for t in range(T):
+                individual_payment += market_prices[t//granularity] * final_state["u"][i, t] * dt
+            # Store the payment in the results dictionary
+            self.results["individual_payment"][ev["id"]] = individual_payment
+
+        # 8) If vcg is enabled, compute additional metrics
         if self.config.get("vcg", False):
             vcg_tax_dict = {}
             # Compute total cost for the "others" in the full run for each EV n
             for ev in evs:
                 ev_id = ev["id"]
                 # Sum cost for all EVs except the one with id ev_id
-                original_others_cost = sum(individual_cost[other_ev["id"]] for other_ev in evs if other_ev["id"] != ev_id)
+                original_others_cost = sum(
+                    individual_cost[other_ev["id"]] + self.results["individual_payment"][other_ev["id"]]
+                    for other_ev in evs if other_ev["id"] != ev_id
+                )
 
                 # Create a copy of the config and remove EV n
                 config_without_ev = self.config.copy()
@@ -357,10 +370,22 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
 
                 # Extract individual cost breakdown from the run without EV n
                 individual_cost_without_ev = results_without_ev.get("individual_cost", {})
-                new_others_cost = sum(individual_cost_without_ev.values())
+                new_individual_payments = results_without_ev.get("individual_payment", {})
+                new_others_cost = sum(
+                    individual_cost_without_ev[ev_id] + new_individual_payments.get(ev_id, 0.0)
+                    for ev_id in individual_cost_without_ev
+                )
 
                 # The VCG tax for EV n is the difference in the cost incurred by the others:
                 vcg_tax_dict[ev_id] = original_others_cost - new_others_cost
 
             # Store the VCG tax breakdown in the results dictionary
             self.results["vcg_tax"] = vcg_tax_dict
+
+        # Store time flexibility coefficient and desired disconnectino time for each EV
+        self.results["disconnection_time_flexibilities"] = {
+            ev["id"]: ev.get("disconnection_time_flexibility", 0.0)/2 for ev in evs
+        }
+        self.results["desired_disconnection_time"] = {
+            ev["id"]: ev.get("disconnection_time", 0.0) for ev in evs
+        }

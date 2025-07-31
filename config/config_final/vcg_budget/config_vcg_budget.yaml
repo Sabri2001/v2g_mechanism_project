@@ -101,4 +101,4 @@ vcg: true
 plots:
   - soc_evolution
   - market_prices
-  - vcg_tax_violin
+  - vcg_tax_distribution

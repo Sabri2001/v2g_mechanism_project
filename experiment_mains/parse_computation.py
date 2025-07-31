@@ -69,6 +69,7 @@ def gather_computation_times(input_folder):
 
     # Convert list of dicts to DataFrame
     df = pd.DataFrame(all_data)
+    df["method"] = df["method"].map({"centralized": "gurobi", "coordinated": "admm"})
     return df
 
 def plot_computation_times(df, output_path="computation_times.png"):
@@ -76,6 +77,7 @@ def plot_computation_times(df, output_path="computation_times.png"):
     Given a DataFrame with ['num_evs', 'method', 'time'],
     make a boxplot with x-axis=[5,15,30] (sorted), hue=method,
     and log-scale y-axis. Adds extra padding between labels and axes.
+    Enlarged fonts for all labels, ticks, and legend.
     """
     sns.set(style="whitegrid")
 
@@ -93,14 +95,17 @@ def plot_computation_times(df, output_path="computation_times.png"):
         width=0.6
     )
 
-    # Increase padding with 'labelpad'
-    ax.set_xlabel("Number of EVs", fontsize=12, labelpad=15)
-    ax.set_ylabel("Computation Time (s)", fontsize=12, labelpad=15)
-    ax.set_title("Computation Times: Centralized vs. Coordinated", fontsize=13)
+    # Increase label fonts and padding
+    ax.set_xlabel("Number of EVs", fontsize=15, labelpad=15)
+    ax.set_ylabel("Computation Time (s)", fontsize=15, labelpad=15)
 
     ax.set_yscale("log")
 
-    ax.legend(title="Method", fontsize=10)
+    # Enlarge tick labels
+    ax.tick_params(axis='both', which='major', labelsize=15)
+
+    # Enlarge legend
+    ax.legend(title="Method", fontsize=12, title_fontsize=12)
 
     plt.tight_layout()
     plt.savefig(output_path, dpi=150)
