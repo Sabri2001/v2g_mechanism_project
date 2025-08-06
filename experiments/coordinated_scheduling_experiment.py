@@ -241,7 +241,7 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
         # 1) SoC results + disconnection times
         for i, ev in enumerate(evs):
             desired_disconnection_time.append(ev["disconnection_time"])
-            actual_disconnection_time.append(final_state["t_actual"][i])
+            actual_disconnection_time.append(final_state["t_actual"][i]) # already convert to hours
 
             # SoC
             for t in range(T+1):
@@ -249,11 +249,11 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
                 soc_over_time[ev["id"]][t] = float(soc_val)
 
             # compute needed energy
-            needed_i = ev["desired_soc"] - ev["initial_soc"]
-            if needed_i > 0:
-                total_energy_needed += needed_i
+            # needed_i = ev["desired_soc"] - ev["initial_soc"]
+            # if needed_i > 0:
+            #     total_energy_needed += needed_i
 
-        # 2) Per-time-step aggregator costs
+        # 2) Per-time-step energy and battery wear costs
         for t in range(T):
             sum_op_cost_t = 0.0
             sum_energy_cost_t = 0.0
@@ -269,56 +269,70 @@ class CoordinatedSchedulingExperiment(BaseExperiment):
                 sum_energy_cost_t += cost_energy
 
                 # if u_it < 0, we have V2G
-                if u_it < 0:
-                    total_energy_transferred += -u_it * dt
+                # if u_it < 0:
+                #     total_energy_transferred += -u_it * dt
 
             operator_cost_vector[t] = sum_op_cost_t
             energy_cost_vector[t] = sum_energy_cost_t
 
+
+        # 3) Per-EV soc and delay costs
+        soc_cost_vector = np.zeros(len(evs))
+        delay_cost_vector = np.zeros(len(evs))
+        for i, ev in enumerate(evs):
+            # SoC cost: quadratic penalty on final SoC deviation
+            soc_cost_vector[i] = 0.5 * ev["soc_flexibility"] * (ev["desired_soc"] - final_state["soc"][i, T]) ** 2
+
+            # Delay cost: quadratic penalty on disconnection time deviation
+            delay_cost_vector[i] = 0.5 * ev["disconnection_time_flexibility"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
+
         # 3) V2G fraction
-        v2g_fraction = 0.0
-        if total_energy_needed > 0:
-            v2g_fraction = (total_energy_transferred / total_energy_needed)*100.0
+        # v2g_fraction = 0.0
+        # if total_energy_needed > 0:
+        #     v2g_fraction = (total_energy_transferred / total_energy_needed)*100.0
 
         # 4) Save final dictionary
+        total_cost = float(operator_cost_vector.sum() + energy_cost_vector.sum() +
+                           soc_cost_vector.sum() + delay_cost_vector.sum())
+        
         self.results = {
             "operator_cost_over_time": operator_cost_vector.tolist(),
             "energy_cost_over_time": energy_cost_vector.tolist(),
-            "sum_operator_costs": float(operator_cost_vector.sum()),
-            "sum_energy_costs": float(energy_cost_vector.sum()),
+            "total_cost": total_cost,
+            "sum_energy_cost": float(energy_cost_vector.sum()),
             "soc_over_time": soc_over_time,
             "desired_disconnection_time": desired_disconnection_time,
             "actual_disconnection_time": actual_disconnection_time,
-            "v2g_fraction": v2g_fraction,
+            # "v2g_fraction": v2g_fraction,
             "u": final_state["u"].tolist(),
             "t_actual": final_state["t_actual"].tolist()
         }
 
         # 5) If walras_tax is enabled, compute additional metrics
-        if self.config.get("walras_tax", False):
-            energy_cost_dict = {}
-            adaptability_cost_dict = {}
-            congestion_cost_dict = {}
-            dual = final_state["dual"]  # Global dual variable array (length T)
-            for i, ev in enumerate(evs):
-                ev_id = ev["id"]
+        # if self.config.get("walras_tax", False):
+        #     energy_cost_dict = {}
+        #     adaptability_cost_dict = {}
+        #     congestion_cost_dict = {}
+        #     dual = final_state["dual"]  # Global dual variable array (length T)
+        #     for i, ev in enumerate(evs):
+        #         ev_id = ev["id"]
 
-                # Energy cost: sum over t of market_prices[t] * u[i,t]
-                energy_cost_ev = sum(market_prices[t//granularity] * final_state["u"][i, t] for t in range(T)) * dt
-                energy_cost_dict[ev_id] = energy_cost_ev
+        #         # Energy cost: sum over t of market_prices[t] * u[i,t]
+        #         energy_cost_ev = sum(market_prices[t//granularity] * final_state["u"][i, t] for t in range(T)) * dt
+        #         energy_cost_dict[ev_id] = energy_cost_ev
 
-                # Adaptability cost: quadratic penalty on disconnect time deviation
-                adaptability_cost_ev = 0.5 * ev["disconnection_time_flexibility"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
-                adaptability_cost_dict[ev_id] = adaptability_cost_ev    
+        #         # Adaptability cost: quadratic penalty on disconnect time deviation
+        #         adaptability_cost_ev = 0.5 * ev["disconnection_time_flexibility"] * ((ev["disconnection_time"] - final_state["t_actual"][i]) ** 2)
+        #         adaptability_cost_dict[ev_id] = adaptability_cost_ev    
 
-                # Congestion cost: extra cost due to dual variables ("Walras tax")
-                congestion_cost_ev = sum(dual[t] * final_state["u"][i, t] for t in range(T)) * dt
-                congestion_cost_dict[ev_id] = congestion_cost_ev
+        #         # Congestion cost: extra cost due to dual variables ("Walras tax")
+        #         congestion_cost_ev = sum(dual[t] * final_state["u"][i, t] for t in range(T)) * dt
+        #         congestion_cost_dict[ev_id] = congestion_cost_ev
 
-            # Add the new metrics to the results dictionary
-            self.results["energy_cost"] = energy_cost_dict
-            self.results["adaptability_cost"] = adaptability_cost_dict
-            self.results["congestion_cost"] = congestion_cost_dict
+        #     # Add the new metrics to the results dictionary
+        #     self.results["energy_cost"] = energy_cost_dict
+        #     self.results["adaptability_cost"] = adaptability_cost_dict
+        #     self.results["congestion_cost"] = congestion_cost_dict
 
         # 6) Compute individual costs (without payments)
         individual_cost = {}

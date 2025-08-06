@@ -8,7 +8,7 @@ import time
 from experiments.base_experiment import BaseExperiment
 
 
-class CentralizedSchedulingExperiment(BaseExperiment):
+class UnidirectionalCentralizedSchedulingExperiment(BaseExperiment):
     """
     Solves the EV scheduling problem with a full centralized Gurobi formulation.
     All EVs are optimized simultaneously subject to their individual constraints
@@ -50,7 +50,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             M = battery_cap + max_charge * T
             
             # Create variables
-            u = model.addVars(T, lb=-max_discharge, ub=max_charge, name=f"u_{ev_id}")
+            u = model.addVars(T, lb=0, ub=max_charge, name=f"u_{ev_id}")
             abs_u = model.addVars(T, lb=0, name=f"abs_u_{ev_id}")
             b = model.addVars(T, vtype=GRB.BINARY, name=f"b_{ev_id}")
             delta = model.addVars(T, vtype=GRB.BINARY, name=f"delta_{ev_id}")

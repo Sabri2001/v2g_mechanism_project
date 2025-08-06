@@ -9,6 +9,7 @@ from experiments.uncoordinated_charging_experiment import UncoordinatedChargingE
 from experiments.coordinated_scheduling_experiment import CoordinatedSchedulingExperiment
 from experiments.unidirectional_coordinated_scheduling_experiment import UnidirectionalCoordinatedSchedulingExperiment
 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
+from experiments.unidirectional_centralized_scheduling_experiment import UnidirectionalCentralizedSchedulingExperiment
 
 # Results
 from results.result_handler import ResultHandler
@@ -50,7 +51,7 @@ def main(config_path):
     """
     # Set up logging
     logging.basicConfig(
-        level=logging.INFO,
+        level=logging.WARNING,
         format="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
@@ -83,6 +84,7 @@ def main(config_path):
         "coordinated": CoordinatedSchedulingExperiment,
         "unidirectional_coordinated": UnidirectionalCoordinatedSchedulingExperiment,
         "centralized": CentralizedSchedulingExperiment,
+        "unidirectional_centralized": UnidirectionalCentralizedSchedulingExperiment,
     }
 
     experiment_types = config.get("experiment_types", [])

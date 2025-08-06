@@ -31,7 +31,7 @@ We conclude with numerical simulations using real data to study the value of def
 ```
 # Install dependencies from environment.yml
 conda env create -f environment.yml
-conda activate v2g-mechanism
+conda activate v2g
 ```
 
 ### Running Experiments
