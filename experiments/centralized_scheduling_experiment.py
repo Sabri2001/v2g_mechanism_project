@@ -224,7 +224,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             
             for t in range(T):
                 u_val = ev_vars["u"][t].X
-                cost_energy = market_prices[t//granularity] * u_val
+                cost_energy = market_prices[t//granularity] * u_val * dt
                 cost_wear = ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
                 wear_cost_vector[t] += cost_energy + cost_wear
                 energy_cost_vector[t] += cost_energy

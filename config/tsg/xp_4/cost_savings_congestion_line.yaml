@@ -1,9 +1,9 @@
 # NAME XP
-folder: "tsg/xp_2"
-name_xp: "cost_savings_line"
+folder: "tsg/xp_4"
+name_xp: "cost_savings_congestion_line"
 
 # EXPERIMENT TYPE
-experiment_types: ["centralized", "unidirectional_centralized"]
+experiment_types: ["centralized", "inflexible_centralized"]
 
 # NUMBER OF RUNS
 num_runs: 20
@@ -20,7 +20,7 @@ time_range: [10, 22]  # Time from 10 AM to 10 PM
 seed: 42
 granularity: 4
 market_prices_csv: "data/hub_prices.csv"
-evcs_power_limit: 15 # so oversubscription of 2.2 
+evcs_power_limit: 10 # so oversubscription of 3.3 
 alpha_factor: 1.0
 battery_factor: 1.0 
 alpha_model_path: "models/gmm_alpha.pkl"

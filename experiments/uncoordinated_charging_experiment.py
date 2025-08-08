@@ -10,23 +10,22 @@ class UncoordinatedChargingExperiment(BaseExperiment):
         each EV's possible charge rate to evcs_power_limit / number_of_EVs.
         """
         # Extract configuration settings
-        time_range = self.config["time_range"]  # e.g. [10, 22]
-        start_time, end_time = time_range
-        T = end_time - start_time  # Total number of time slots
-        market_prices = self.config["market_prices"]  # Should have length T
-        evs = self.config["evs"]  # List of EV dictionaries
-        evcs_power_limit = self.config["evcs_power_limit"]  # Global EVCS power limit
-
-        # Validate input lengths
-        if len(market_prices) != T:
-            raise ValueError("Length of market_prices must match the time range (T).")
+        time_range = self.config["time_range"]
+        T = self.config["T"]
+        dt = self.config["dt"]
+        granularity = self.config["granularity"]
+        start_time, _ = time_range
+        start_step = start_time * granularity
+        market_prices = self.config["market_prices"]
+        evs = self.config["evs"]
+        evcs_power_limit = self.config["evcs_power_limit"]
 
         # Prepare results structure
         results = {
             "operator_cost_over_time": np.zeros(T).tolist(),
-            "energy_cost_over_time": np.zeros(T).tolist(),  # Track only the energy component
-            "sum_operator_costs": 0,
-            "sum_energy_costs": 0,
+            "energy_cost_over_time": np.zeros(T).tolist(),
+            "total_cost": 0,
+            "total_energy_cost": 0,
             "soc_over_time": {
                 ev["id"]: [ev["initial_soc"]] + [0] * T for ev in evs
             },
@@ -40,70 +39,82 @@ class UncoordinatedChargingExperiment(BaseExperiment):
         results["individual_cost"] = {}
         results["individual_payment"] = {}
 
-        for ev in evs:
-            ev_id = ev["id"]
-            soc = ev["initial_soc"]
-            desired_soc = ev["desired_soc"]
-            max_rate = ev["max_charge_rate"]
-            disconnection_time = ev["disconnection_time"]
-            battery_wear = ev["battery_wear_cost_coefficient"]
-            energy_efficiency = ev["energy_efficiency"]
-            beta = ev["soc_flexibility"]
+        active_evs = {ev["id"]: ev for ev in evs}
+        remaining_soc = {ev["id"]: ev["initial_soc"] for ev in evs}
 
-            # Initialize per-EV totals
-            individual_cost = 0.0
-            individual_payment = 0.0
+        for step_idx in range(T):
+            actual_step = start_step + step_idx
 
-            for t in range(T):
-                actual_time = start_time + t
+            # Identify EVs that are still connected and not fully charged
+            charging_evs = [
+                ev for ev_id, ev in active_evs.items()
+                if remaining_soc[ev_id] < ev["desired_soc"]
+                and actual_step < ev["disconnection_time"] * granularity
+            ]
 
-                if soc >= desired_soc or actual_time >= disconnection_time:
-                    for t_remaining in range(t + 1, T + 1):
-                        results["soc_over_time"][ev_id][t_remaining] = soc
-                    break
+            num_active = len(charging_evs)
+            if num_active == 0:
+                continue  # No one to charge this step
+
+            evcs_per_ev_rate = evcs_power_limit / num_active
+
+            for ev in charging_evs:
+                ev_id = ev["id"]
+                soc = remaining_soc[ev_id]
+                desired_soc = ev["desired_soc"]
+                max_rate = ev["max_charge_rate"]
+                battery_wear = ev["battery_wear_cost_coefficient"]
+                energy_efficiency = ev["energy_efficiency"]
 
                 possible_charge = min(
-                    desired_soc - soc,
-                    max_rate,
-                    evcs_per_ev_rate
+                    (desired_soc - soc) / energy_efficiency,
+                    max_rate * dt,
+                    evcs_per_ev_rate * dt
                 )
 
                 usable_energy = possible_charge * energy_efficiency
                 soc += usable_energy
-                results["soc_over_time"][ev_id][t + 1] = soc
+                remaining_soc[ev_id] = soc
+                results["soc_over_time"][ev_id][step_idx + 1] = soc
 
-                energy_cost = market_prices[t] * possible_charge
+                energy_cost = market_prices[step_idx // granularity] * possible_charge
                 wear_cost = battery_wear * abs(usable_energy)
 
-                individual_cost += wear_cost
-                individual_payment += market_prices[t] * possible_charge
+                results["operator_cost_over_time"][step_idx] += energy_cost + wear_cost
+                results["energy_cost_over_time"][step_idx] += energy_cost
 
-                results["operator_cost_over_time"][t] += energy_cost + wear_cost
-                results["energy_cost_over_time"][t] += energy_cost
+                results["individual_cost"].setdefault(ev_id, 0.0)
+                results["individual_payment"].setdefault(ev_id, 0.0)
+                results["individual_cost"][ev_id] += wear_cost + energy_cost
+                results["individual_payment"][ev_id] += energy_cost
 
-            else:
-                for t_remaining in range(t + 1, T + 1):
+        # Final loop to handle remaining SoC and deviation cost
+        for ev in evs:
+            ev_id = ev["id"]
+            soc = remaining_soc[ev_id]
+            desired_soc = ev["desired_soc"]
+            beta = ev["soc_flexibility"]
+
+            for t_remaining in range(T + 1):
+                if results["soc_over_time"][ev_id][t_remaining] == 0:
                     results["soc_over_time"][ev_id][t_remaining] = soc
 
-            # Final SoC after all time steps
-            final_soc = results["soc_over_time"][ev_id][T]
-            soc_deviation_cost = 0.5 * beta * (desired_soc - final_soc) ** 2
-            individual_cost += soc_deviation_cost
+            soc_deviation_cost = 0.5 * beta * (desired_soc - soc) ** 2
+            results["individual_cost"][ev_id] += soc_deviation_cost
 
-            # Store individual results
-            results["individual_cost"][ev_id] = individual_cost
-            results["individual_payment"][ev_id] = individual_payment
+        # Compute total cost
+        total_cost = sum(results["individual_cost"].values())
 
         # Aggregate final costs
-        results["sum_operator_costs"] = sum(results["operator_cost_over_time"])
-        results["sum_energy_costs"] = sum(results["energy_cost_over_time"])
+        results["total_cost"] = total_cost
+        results["total_energy_cost"] = sum(results["energy_cost_over_time"])
 
         # For consistency with other experiments, set these fields even if uncoordinated
         results["desired_disconnection_time"] = [ev["disconnection_time"] for ev in evs]
         results["actual_disconnection_time"] = [ev["disconnection_time"] for ev in evs]
 
         # No V2G in uncoordinated scenario, so set fraction to 0
-        results["v2g_fraction"] = 0
+        # results["v2g_fraction"] = 0
 
         # Save final results
         self.results = results

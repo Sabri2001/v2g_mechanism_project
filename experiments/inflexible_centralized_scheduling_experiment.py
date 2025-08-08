@@ -1,4 +1,5 @@
 import logging
+from pyexpat import model
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
@@ -8,7 +9,7 @@ import time
 from experiments.base_experiment import BaseExperiment
 
 
-class UnidirectionalCentralizedSchedulingExperiment(BaseExperiment):
+class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
     """
     Solves the EV scheduling problem with a full centralized Gurobi formulation.
     All EVs are optimized simultaneously subject to their individual constraints
@@ -50,9 +51,8 @@ class UnidirectionalCentralizedSchedulingExperiment(BaseExperiment):
             M = battery_cap + max_charge * T
             
             # Create variables
-            u = model.addVars(T, lb=0, ub=max_charge, name=f"u_{ev_id}")
+            u = model.addVars(T, lb=-max_discharge, ub=max_charge, name=f"u_{ev_id}")
             abs_u = model.addVars(T, lb=0, name=f"abs_u_{ev_id}")
-            b = model.addVars(T, vtype=GRB.BINARY, name=f"b_{ev_id}")
             delta = model.addVars(T, vtype=GRB.BINARY, name=f"delta_{ev_id}")
             soc = model.addVars(T + 1, lb=0, ub=battery_cap, name=f"soc_{ev_id}")
             t_actual = model.addVar(vtype=GRB.INTEGER, lb=start_step + 1, ub=end_step, name=f"t_actual_{ev_id}")
@@ -60,7 +60,6 @@ class UnidirectionalCentralizedSchedulingExperiment(BaseExperiment):
             EV_vars[ev_id] = {
                 "u": u,
                 "abs_u": abs_u,
-                "b": b,
                 "delta": delta,
                 "soc": soc,
                 "t_actual": t_actual,
@@ -104,15 +103,9 @@ class UnidirectionalCentralizedSchedulingExperiment(BaseExperiment):
             # Initial SoC constraint
             model.addConstr(ev_vars["soc"][0] == initial_soc, name=f"InitialSoC_{ev_id}")
             
-            # Exactly one disconnection time: sum_t b[t] == 1
-            model.addConstr(gp.quicksum(ev_vars["b"][t] for t in range(T_ev)) == 1,
-                            name=f"OneDisconnection_{ev_id}")
-            
-            # Link t_actual with disconnection indicator
-            model.addConstr(
-                ev_vars["t_actual"] == gp.quicksum((start_step + t + 1) * ev_vars["b"][t] for t in range(T_ev)),
-                name=f"t_actual_link_{ev_id}"
-            )
+            # Hard constraint on disconnection time
+            desired_step = ev["disconnection_time"] * granularity
+            model.addConstr(ev_vars["t_actual"] == desired_step, name=f"Fixed_t_actual_{ev_id}")
             
             # SoC dynamics
             for t in range(T_ev):
@@ -163,18 +156,13 @@ class UnidirectionalCentralizedSchedulingExperiment(BaseExperiment):
             ev_id = ev["id"]
             ev_vars = EV_vars[ev_id]
             battery_wear = ev["battery_wear_cost_coefficient"]
-            alpha = ev["disconnection_time_flexibility"]
             beta = ev["soc_flexibility"]
-            desired_disc_time = ev["disconnection_time"]
             desired_soc = ev["desired_soc"]
             eff = ev["energy_efficiency"]
             cost_ev = 0
             for t in range(T):
                 cost_ev += market_prices[t//granularity] * ev_vars["u"][t] * dt \
                            + battery_wear * ev_vars["abs_u"][t] * dt * eff
-            # Quadratic penalty on disconnection time deviation
-            desired_step = desired_disc_time * granularity
-            cost_ev += 0.5 * alpha * ((desired_step - ev_vars["t_actual"]) * (desired_step - ev_vars["t_actual"]))/granularity / granularity
             # Quadratic penalty on soc deviation
             delta_soc = model.addVar(lb=0, name=f"delta_soc_{ev_id}")
             model.addConstr(delta_soc >= desired_soc - ev_vars["soc"][T], name=f"delta_soc_constraint_{ev_id}")

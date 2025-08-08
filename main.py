@@ -7,9 +7,9 @@ from datetime import datetime
 from config.config_handler import ConfigHandler
 from experiments.uncoordinated_charging_experiment import UncoordinatedChargingExperiment
 from experiments.coordinated_scheduling_experiment import CoordinatedSchedulingExperiment
-from experiments.unidirectional_coordinated_scheduling_experiment import UnidirectionalCoordinatedSchedulingExperiment
 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
 from experiments.unidirectional_centralized_scheduling_experiment import UnidirectionalCentralizedSchedulingExperiment
+from experiments.inflexible_centralized_scheduling_experiment import InflexibleCentralizedSchedulingExperiment
 
 # Results
 from results.result_handler import ResultHandler
@@ -82,9 +82,9 @@ def main(config_path):
     experiment_classes = {
         "uncoordinated": UncoordinatedChargingExperiment,
         "coordinated": CoordinatedSchedulingExperiment,
-        "unidirectional_coordinated": UnidirectionalCoordinatedSchedulingExperiment,
         "centralized": CentralizedSchedulingExperiment,
         "unidirectional_centralized": UnidirectionalCentralizedSchedulingExperiment,
+        "inflexible_centralized": InflexibleCentralizedSchedulingExperiment,
     }
 
     experiment_types = config.get("experiment_types", [])
