@@ -54,9 +54,6 @@ class ResultHandler:
     def save_log(self) -> None:
         """
         Saves experiment configuration and results to a JSON log file.
-
-        Instead of hardcoding specific keys, we dump everything in self.results
-        under "results". If needed, you can keep filtering certain keys.
         """
         log_data = {
             "config": self.config,
@@ -73,25 +70,17 @@ class ResultHandler:
         """
         Saves plots by calling the corresponding PlotHandler methods only if those
         plot names are requested in config['plots'].
-
-        Some plots are managed by SummaryResultHandler (e.g., total_cost_bars),
-        so we skip them here to avoid duplication.
         """
         requested_plots: List[str] = self.config.get("plots", [])
 
         # Set up the time axis
-        granularity = self.config["granularity"]
         start_time, end_time = self.config["time_range"]
-        T = self.config["T"]
-        time_axis = [start_time + t*self.config["dt"] for t in range(T+1)]
+        nb_time_steps = self.config["nb_time_steps"]
+        time_axis = [start_time + step*self.config["dt"] for step in range(nb_time_steps + 1)]
 
         # Mapping from plot_name to the corresponding PlotHandler method
-        # Only plots that are actually handled here
         plot_methods = {
-            "total_cost_vs_energy_cost": PlotHandler.plot_total_cost_vs_energy_cost,
             "soc_evolution": PlotHandler.plot_soc_evolution,
-            "market_prices": PlotHandler.plot_market_prices,
-            "payment_comparison": PlotHandler.plot_payment_comparison,
         }
 
         # Loop over all plot_methods, only generate plots if they are requested
@@ -100,19 +89,9 @@ class ResultHandler:
                 logging.debug(f"Plot '{plot_name}' not requested. Skipping.")
                 continue
 
-            output_path = os.path.join(self.output_dir, f"{plot_name}.png")
-
-            # Special-case handling
-            if plot_name == "market_prices":
-                market_prices = self.config.get("market_prices")
-                if market_prices:
-                    plot_method(market_prices, [start_time, end_time], output_path)
-                else:
-                    logging.warning(
-                        "No 'market_prices' found in config. Skipping market_prices plot."
-                    )
-
-            elif plot_name == "soc_evolution":
+            output_path = os.path.join(self.output_dir, f"{plot_name}.pdf")
+                    
+            if plot_name == "soc_evolution":
                 # This plot function requires `results`, `time_axis`, `config`, and `output_path`.
                 plot_method(self.results, time_axis, output_path, self.config)
 

@@ -11,7 +11,7 @@ class UncoordinatedChargingExperiment(BaseExperiment):
         """
         # Extract configuration settings
         time_range = self.config["time_range"]
-        T = self.config["T"]
+        nb_time_steps = self.config["nb_time_steps"]
         dt = self.config["dt"]
         granularity = self.config["granularity"]
         start_time, _ = time_range
@@ -22,12 +22,12 @@ class UncoordinatedChargingExperiment(BaseExperiment):
 
         # Prepare results structure
         results = {
-            "operator_cost_over_time": np.zeros(T).tolist(),
-            "energy_cost_over_time": np.zeros(T).tolist(),
+            "operator_cost_over_time": np.zeros(nb_time_steps).tolist(),
+            "energy_cost_over_time": np.zeros(nb_time_steps).tolist(),
             "total_cost": 0,
             "total_energy_cost": 0,
             "soc_over_time": {
-                ev["id"]: [ev["initial_soc"]] + [0] * T for ev in evs
+                ev["id"]: [ev["initial_soc"]] + [0] * nb_time_steps for ev in evs
             },
         }
 
@@ -42,7 +42,7 @@ class UncoordinatedChargingExperiment(BaseExperiment):
         active_evs = {ev["id"]: ev for ev in evs}
         remaining_soc = {ev["id"]: ev["initial_soc"] for ev in evs}
 
-        for step_idx in range(T):
+        for step_idx in range(nb_time_steps):
             actual_step = start_step + step_idx
 
             # Identify EVs that are still connected and not fully charged
@@ -95,9 +95,9 @@ class UncoordinatedChargingExperiment(BaseExperiment):
             desired_soc = ev["desired_soc"]
             beta = ev["soc_flexibility"]
 
-            for t_remaining in range(T + 1):
-                if results["soc_over_time"][ev_id][t_remaining] == 0:
-                    results["soc_over_time"][ev_id][t_remaining] = soc
+            for steps_remaining in range(nb_time_steps + 1):
+                if results["soc_over_time"][ev_id][steps_remaining] == 0:
+                    results["soc_over_time"][ev_id][steps_remaining] = soc
 
             soc_deviation_cost = 0.5 * beta * (desired_soc - soc) ** 2
             results["individual_cost"][ev_id] += soc_deviation_cost

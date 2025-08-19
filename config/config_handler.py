@@ -331,12 +331,18 @@ class ConfigHandler:
                 )
 
             # 2) Sample disconnect_time
-            disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)
-            disc_mean = disc_means[disc_idx][0]
-            disc_std = np.sqrt(disc_covs[disc_idx][0][0])
-            sampled_disconnect = int(round(self.random_state.normal(loc=disc_mean, scale=disc_std)))
-            # Clamp to valid time range
-            ev_copy["disconnection_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
+            if (self.config.get("override", False) 
+                and ev["id"] == 0 
+                and self.config["stochastic"]):
+                # Force override for EV 0
+                ev_copy["disconnection_time"] = self.config["override_disconnection_time"]
+            else:
+                disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)
+                disc_mean = disc_means[disc_idx][0]
+                disc_std = np.sqrt(disc_covs[disc_idx][0][0])
+                sampled_disconnect = int(round(self.random_state.normal(loc=disc_mean, scale=disc_std)))
+                # Clamp to valid time range
+                ev_copy["disconnection_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
 
             # 3) Sample (initial_soc, desired_soc) and min_soc
             ev_copy = self._sample_soc(ev_copy)

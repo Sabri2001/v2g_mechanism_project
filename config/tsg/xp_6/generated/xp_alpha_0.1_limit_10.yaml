@@ -1,12 +1,12 @@
 # NAME XP
-folder: "tsg/xp_1"
-name_xp: "cost_savings_soc_bw_1_0"
+folder: "tsg/xp_6/cost_savings_limit_10_af_0.1_20250813_160625"
+name_xp: "cost_savings_vs_naive_line"
 
 # EXPERIMENT TYPE
-experiment_types: ["centralized"]
+experiment_types: ["centralized", "uncoordinated"]
 
 # NUMBER OF RUNS
-num_runs: 1
+num_runs: 20
 
 # ADMM PARAMETERS
 nu: 0.1
@@ -14,14 +14,14 @@ nu_multiplier: 1.1
 max_iter: 100
 
 # SIMULATION PARAMETERS
-stochastic: false
+extreme_days: true
+stochastic: true
 time_range: [10, 22]  # Time from 10 AM to 10 PM
 seed: 42
-market_prices: [141.93,134.66,131.39,132.57,138.1,151.38,144.9,223.78,198.09,171.76,168.51,156.74] # Jan. 17, in $/MWh, 10 AM to 10 PM
 granularity: 4
 market_prices_csv: "../data/hub_prices.csv"
-evcs_power_limit: 30 # full parallel charge of all EVs (almost) possible
-alpha_factor: 1.0
+evcs_power_limit: 10
+alpha_factor: 0.1
 battery_factor: 1.0 
 alpha_model_path: "../models/gmm_alpha.pkl"
 disconnection_model_path: "../models/gmm_disconnection_model.pkl"

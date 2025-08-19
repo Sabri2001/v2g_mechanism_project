@@ -6,14 +6,12 @@ from datetime import datetime
 # Experiments
 from config.config_handler import ConfigHandler
 from experiments.uncoordinated_charging_experiment import UncoordinatedChargingExperiment
-from experiments.coordinated_scheduling_experiment import CoordinatedSchedulingExperiment
 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
 from experiments.unidirectional_centralized_scheduling_experiment import UnidirectionalCentralizedSchedulingExperiment
 from experiments.inflexible_centralized_scheduling_experiment import InflexibleCentralizedSchedulingExperiment
 
 # Results
 from results.result_handler import ResultHandler
-from results.summary_result_handler import SummaryResultHandler
 
 
 def run_experiment(experiment_class, config, output_dir, experiment_type, run_id, sampled_day_data):
@@ -64,15 +62,15 @@ def main(config_path):
 
     start_time, end_time = config["time_range"]
     granularity = config["granularity"]
-    T = (end_time - start_time) * granularity
+    nb_time_steps = (end_time - start_time) * granularity
     dt = 1.0 / granularity
-    config["T"] = T
+    config["nb_time_steps"] = nb_time_steps
     config["dt"] = dt
 
     # 2) Create Output Directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     base_output_dir = os.path.join(
-        "outputs",
+        "../outputs",
         config.get("folder", "default_folder"),
         f"{config.get('name_xp', 'default_xp')}_{timestamp}"
     )
@@ -81,7 +79,6 @@ def main(config_path):
     # 3) Map Experiment Types to Classes
     experiment_classes = {
         "uncoordinated": UncoordinatedChargingExperiment,
-        "coordinated": CoordinatedSchedulingExperiment,
         "centralized": CentralizedSchedulingExperiment,
         "unidirectional_centralized": UnidirectionalCentralizedSchedulingExperiment,
         "inflexible_centralized": InflexibleCentralizedSchedulingExperiment,
@@ -119,12 +116,6 @@ def main(config_path):
             )
 
     logging.info("All experiments completed.")
-
-    # 5) Generate Summary Plots (Across All Runs)
-    summary_handler = SummaryResultHandler(base_output_dir, experiment_types)
-    summary_handler.aggregate_results()
-    summary_handler.generate_summary_plots(config.get("plots", []))
-    summary_handler.save_computation_time_stats()
 
 
 if __name__ == "__main__":

@@ -1,5 +1,4 @@
 import logging
-from pyexpat import model
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
@@ -25,7 +24,7 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
     def run(self):
         # 1) Extract common data from config
         start_time, end_time = self.config["time_range"]
-        T = self.config["T"]
+        nb_time_steps = self.config["nb_time_steps"]
         dt = self.config["dt"]
         granularity = self.config["granularity"]
         start_step = start_time * granularity
@@ -48,31 +47,33 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
             max_discharge = ev["max_discharge_rate"]
             battery_cap = ev["battery_capacity"]
             # Big-M for this EV – used in disconnection and SoC threshold constraints
-            M = battery_cap + max_charge * T
-            
+            M = battery_cap + max_charge * nb_time_steps
+
             # Create variables
-            u = model.addVars(T, lb=-max_discharge, ub=max_charge, name=f"u_{ev_id}")
-            abs_u = model.addVars(T, lb=0, name=f"abs_u_{ev_id}")
-            delta = model.addVars(T, vtype=GRB.BINARY, name=f"delta_{ev_id}")
-            soc = model.addVars(T + 1, lb=0, ub=battery_cap, name=f"soc_{ev_id}")
-            t_actual = model.addVar(vtype=GRB.INTEGER, lb=start_step + 1, ub=end_step, name=f"t_actual_{ev_id}")
+            u = model.addVars(nb_time_steps, lb=-max_discharge, ub=max_charge, name=f"u_{ev_id}")
+            abs_u = model.addVars(nb_time_steps, lb=0, name=f"abs_u_{ev_id}")
+            b = model.addVars(nb_time_steps, vtype=GRB.BINARY, name=f"b_{ev_id}")
+            delta = model.addVars(nb_time_steps, vtype=GRB.BINARY, name=f"delta_{ev_id}")
+            soc = model.addVars(nb_time_steps + 1, lb=0, ub=battery_cap, name=f"soc_{ev_id}")
+            actual_disconnection_step = model.addVar(vtype=GRB.INTEGER, lb=start_step + 1, ub=end_step, name=f"t_actual_{ev_id}")
             
             EV_vars[ev_id] = {
                 "u": u,
                 "abs_u": abs_u,
+                "b": b,
                 "delta": delta,
                 "soc": soc,
-                "t_actual": t_actual,
+                "actual_disconnection_step": actual_disconnection_step,
                 "M": M
             }
         if self.warmstart_solutions is not None:
             for ev in evs:
                 ev_id = ev["id"]
                 if ev_id in self.warmstart_solutions:
-                    for t in range(T):
-                        # Suppose your var for EV ev_id is: EV_vars[ev_id]["u"][t]
+                    for step in range(nb_time_steps):
+                        # Suppose your var for EV ev_id is: EV_vars[ev_id]["u"][step]
                         # Then set:
-                        EV_vars[ev_id]["u"][t].start = self.warmstart_solutions[ev_id][t]
+                        EV_vars[ev_id]["u"][step].start = self.warmstart_solutions[ev_id][step]
 
             # Then also set model.params.AdvBasis = 1 if Gurobi version requires it:
             model.update()
@@ -80,12 +81,12 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
         # 3) Add global constraints: For each time period t, the abs of the sum over EVs of u must not exceed the EVCS power limit.
         global_constraints = {}
         global_abs = {}
-        for t in range(T):
-            global_abs[t] = model.addVar(lb=0, name=f"global_abs_{t}")
-            expr = gp.quicksum(EV_vars[ev["id"]]["u"][t] for ev in evs)
-            model.addConstr(global_abs[t] >= expr, name=f"global_abs_pos_{t}")
-            model.addConstr(global_abs[t] >= -expr, name=f"global_abs_neg_{t}")
-            global_constraints[t] = model.addConstr(global_abs[t] <= evcs_power_limit, name=f"global_constraint_{t}")
+        for step in range(nb_time_steps):
+            global_abs[step] = model.addVar(lb=0, name=f"global_abs_{step}")
+            expr = gp.quicksum(EV_vars[ev["id"]]["u"][step] for ev in evs)
+            model.addConstr(global_abs[step] >= expr, name=f"global_abs_pos_{step}")
+            model.addConstr(global_abs[step] >= -expr, name=f"global_abs_neg_{step}")
+            global_constraints[step] = model.addConstr(global_abs[step] <= evcs_power_limit, name=f"global_constraint_{step}")
 
         # 4) Add individual EV constraints
         for ev in evs:
@@ -98,56 +99,55 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
             initial_soc = ev["initial_soc"]
             min_soc = ev["min_soc"]
             eff = ev["energy_efficiency"]
-            T_ev = T
             
             # Initial SoC constraint
             model.addConstr(ev_vars["soc"][0] == initial_soc, name=f"InitialSoC_{ev_id}")
-            
+
             # Hard constraint on disconnection time
             desired_step = ev["disconnection_time"] * granularity
-            model.addConstr(ev_vars["t_actual"] == desired_step, name=f"Fixed_t_actual_{ev_id}")
-            
+            model.addConstr(ev_vars["actual_disconnection_step"] == desired_step, name=f"Fixed_t_actual_{ev_id}")
+
             # SoC dynamics
-            for t in range(T_ev):
+            for step in range(nb_time_steps):
                 model.addConstr(
-                    ev_vars["soc"][t+1] == ev_vars["soc"][t] + ev_vars["u"][t] * dt * eff,
-                    name=f"SoC_dynamics_{ev_id}_{t}"
+                    ev_vars["soc"][step+1] == ev_vars["soc"][step] + ev_vars["u"][step] * dt * eff,
+                    name=f"SoC_dynamics_{ev_id}_{step}"
                 )
             
             # Absolute value constraints for u
-            for t in range(T_ev):
-                model.addConstr(ev_vars["abs_u"][t] >= ev_vars["u"][t],
-                                name=f"Abs_u_pos_{ev_id}_{t}")
-                model.addConstr(ev_vars["abs_u"][t] >= -ev_vars["u"][t],
-                                name=f"Abs_u_neg_{ev_id}_{t}")
-            
-            # Delta variables: define delta[t] as indicator for t < t_actual
-            for t in range(T_ev):
+            for step in range(nb_time_steps):
+                model.addConstr(ev_vars["abs_u"][step] >= ev_vars["u"][step],
+                                name=f"Abs_u_pos_{ev_id}_{step}")
+                model.addConstr(ev_vars["abs_u"][step] >= -ev_vars["u"][step],
+                                name=f"Abs_u_neg_{ev_id}_{step}")
+
+            # Delta variables: define delta[step] as indicator for step < actual_disconnection_step
+            for step in range(nb_time_steps):
                 model.addConstr(
-                    ev_vars["t_actual"] - (t + start_step) >= 1 - M * (1 - ev_vars["delta"][t]),
-                    name=f"Delta_def1_{ev_id}_{t}"
+                    ev_vars["actual_disconnection_step"] - (step + start_step) >= 1 - M * (1 - ev_vars["delta"][step]),
+                    name=f"Delta_def1_{ev_id}_{step}"
                 )
                 model.addConstr(
-                    ev_vars["t_actual"] - (t + start_step) <= M * ev_vars["delta"][t],
-                    name=f"Delta_def2_{ev_id}_{t}"
+                    ev_vars["actual_disconnection_step"] - (step + start_step) <= M * ev_vars["delta"][step],
+                    name=f"Delta_def2_{ev_id}_{step}"
                 )
             
             # Charging/discharging limits depending on delta:
-            for t in range(T_ev):
+            for step in range(nb_time_steps):
                 model.addConstr(
-                    ev_vars["u"][t] <= max_charge * ev_vars["delta"][t],
-                    name=f"Charge_limit_{ev_id}_{t}"
+                    ev_vars["u"][step] <= max_charge * ev_vars["delta"][step],
+                    name=f"Charge_limit_{ev_id}_{step}"
                 )
                 model.addConstr(
-                    ev_vars["u"][t] >= -max_discharge * ev_vars["delta"][t],
-                    name=f"Discharge_limit_delta_{ev_id}_{t}"
+                    ev_vars["u"][step] >= -max_discharge * ev_vars["delta"][step],
+                    name=f"Discharge_limit_delta_{ev_id}_{step}"
                 )
             
             # Minimum SoC constraints for all time steps.
-            for t in range(T_ev + 1):
+            for step in range(nb_time_steps + 1):
                 model.addConstr(
-                    ev_vars["soc"][t] >= min_soc,
-                    name=f"MinSoC_{ev_id}_{t}"
+                    ev_vars["soc"][step] >= min_soc,
+                    name=f"MinSoC_{ev_id}_{step}"
                 )
         
         # 5) Define the objective function.
@@ -160,12 +160,12 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
             desired_soc = ev["desired_soc"]
             eff = ev["energy_efficiency"]
             cost_ev = 0
-            for t in range(T):
-                cost_ev += market_prices[t//granularity] * ev_vars["u"][t] * dt \
-                           + battery_wear * ev_vars["abs_u"][t] * dt * eff
+            for step in range(nb_time_steps):
+                cost_ev += market_prices[step//granularity] * ev_vars["u"][step] * dt \
+                           + battery_wear * ev_vars["abs_u"][step] * dt * eff
             # Quadratic penalty on soc deviation
             delta_soc = model.addVar(lb=0, name=f"delta_soc_{ev_id}")
-            model.addConstr(delta_soc >= desired_soc - ev_vars["soc"][T], name=f"delta_soc_constraint_{ev_id}")
+            model.addConstr(delta_soc >= desired_soc - ev_vars["soc"][nb_time_steps], name=f"delta_soc_constraint_{ev_id}")
             cost_ev += 0.5 * beta * delta_soc * delta_soc
             total_cost += cost_ev
         
@@ -182,47 +182,43 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
         
         # 7) Extract and aggregate results.
         # Prepare time‐indexed cost vectors and SoC evolution per EV.
-        soc_over_time = {ev["id"]: [0.0] * (T + 1) for ev in evs}
-        energy_cost_vector = [0.0] * T
-        wear_cost_vector = [0.0] * T
-        desired_disconnection_time = []
-        actual_disconnection_time = []
-        soc_cost_per_ev = [0.0] * len(evs)
-        delay_cost_per_ev = [0.0] * len(evs)       
-        # total_energy_needed = 0.0
-        # total_energy_transferred = 0.0
+        soc_over_time = {ev["id"]: [0.0] * (nb_time_steps + 1) for ev in evs}
+        energy_cost_vector = [0.0] * nb_time_steps
+        wear_cost_vector = [0.0] * nb_time_steps
+        desired_disconnection_time = {}
+        actual_disconnection_time = {}
+        soc_cost_per_ev = {}
+        delay_cost_per_ev = {}
 
         for ev in evs:
             ev_id = ev["id"]
             ev_vars = EV_vars[ev_id]
-            t_actual_val = int(round(ev_vars["t_actual"].X))
-            actual_disconnection_time.append(t_actual_val/granularity) # Convert to time in hours
-            desired_disconnection_time.append(ev["disconnection_time"])
 
-            # Collect the operator cost for this EV
-            soc_cost_per_ev[ev_id] = 0.5 * ev["soc_flexibility"] * (ev["desired_soc"] - ev_vars["soc"][T].X) ** 2
-            delay_cost_per_ev[ev_id] = 0.5 * ev["disconnection_time_flexibility"] * (ev["disconnection_time"] - actual_disconnection_time[ev_id]) ** 2
-            
-            for t in range(T + 1):
-                soc_over_time[ev_id][t] = ev_vars["soc"][t].X
-            
-            # needed = ev["desired_soc"] - ev["initial_soc"]
-            # if needed > 0:
-            #     total_energy_needed += needed
-            
-            for t in range(T):
-                u_val = ev_vars["u"][t].X
-                cost_energy = market_prices[t//granularity] * u_val * dt
+            actual_disconnection_step_val = int(round(ev_vars["actual_disconnection_step"].X))
+            actual_disconnection_time[ev_id] = actual_disconnection_step_val / granularity  # hours
+            desired_disconnection_time[ev_id] = ev["disconnection_time"]
+
+            # Operator cost per EV
+            soc_cost_per_ev[ev_id] = 0.5 * ev["soc_flexibility"] * (ev["desired_soc"] - ev_vars["soc"][nb_time_steps].X) ** 2
+            delay_cost_per_ev[ev_id] = 0.5 * ev["disconnection_time_flexibility"] * \
+                                    (ev["disconnection_time"] - actual_disconnection_time[ev_id]) ** 2
+
+            # Store SoC evolution
+            for step in range(nb_time_steps + 1):
+                soc_over_time[ev_id][step] = ev_vars["soc"][step].X
+
+            # Energy and wear costs
+            for step in range(nb_time_steps):
+                u_val = ev_vars["u"][step].X
+                cost_energy = market_prices[step // granularity] * u_val * dt
                 cost_wear = ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
-                wear_cost_vector[t] += cost_energy + cost_wear
-                energy_cost_vector[t] += cost_energy
-                # if u_val < 0:
-                #     total_energy_transferred += -u_val
-        
-        total_cost = sum(energy_cost_vector) + sum(wear_cost_vector) + sum(soc_cost_per_ev) + sum(delay_cost_per_ev)
+                wear_cost_vector[step] += cost_energy + cost_wear
+                energy_cost_vector[step] += cost_energy
+
+        total_cost = sum(energy_cost_vector) + sum(wear_cost_vector) + \
+                    sum(soc_cost_per_ev.values()) + sum(delay_cost_per_ev.values())
         total_energy_cost = sum(energy_cost_vector)
 
-        # v2g_fraction = (total_energy_transferred / total_energy_needed) * 100 if total_energy_needed > 0 else 0.0
         
         # Build the main results dictionary.
         self.results = {
@@ -235,56 +231,25 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
             "soc_over_time": soc_over_time,
             "desired_disconnection_time": desired_disconnection_time,
             "actual_disconnection_time": actual_disconnection_time,
-            # "v2g_fraction": v2g_fraction,
             "solve_time": solve_time,
         }
+
         
-        # 8) Additional metrics if "walras_tax" is enabled.
-        # if self.config.get("walras_tax", False):
-        #     # Attempt to extract dual values from the global constraints.
-        #     duals = []
-        #     for t in range(T):
-        #         try:
-        #             dual_val = global_constraints[t].Pi
-        #         except AttributeError:
-        #             dual_val = 0.0
-        #         duals.append(dual_val)
-            
-        #     energy_cost_dict = {}
-        #     adaptability_cost_dict = {}
-        #     congestion_cost_dict = {}
-        #     for ev in evs:
-        #         ev_id = ev["id"]
-        #         # Energy cost for EV: sum_t market_prices[t]*u[t]
-        #         energy_cost_ev = sum(market_prices[t//granularity] * EV_vars[ev_id]["u"][t].X for t in range(T))
-        #         energy_cost_dict[ev_id] = energy_cost_ev
-        #         # Adaptability cost: quadratic penalty on disconnect time deviation
-        #         adaptability_cost_ev = 0.5 * ev["disconnection_time_flexibility"] * \
-        #             ((ev["disconnection_time"] - EV_vars[ev_id]["t_actual"].X) ** 2)
-        #         adaptability_cost_dict[ev_id] = adaptability_cost_ev
-        #         # Congestion cost: sum_t (dual[t] * u[t])
-        #         congestion_cost_ev = sum(du * EV_vars[ev_id]["u"][t].X for t, du in enumerate(duals))
-        #         congestion_cost_dict[ev_id] = congestion_cost_ev
-            
-        #     self.results["energy_cost"] = energy_cost_dict
-        #     self.results["adaptability_cost"] = adaptability_cost_dict
-        #     self.results["congestion_cost"] = congestion_cost_dict
-        
-        # 9) VCG tax computation if "vcg" flag is enabled.
+        # 8) VCG tax computation if "vcg" flag is enabled.
         if self.config.get("vcg", False):
             # First, compute the individual cost incurred by each EV in the full run.
             individual_cost = {}
             for ev in evs:
                 ev_id = ev["id"]
                 cost_ev = 0.0
-                for t in range(T):
-                    u_val = EV_vars[ev_id]["u"][t].X
-                    cost_ev += market_prices[t//granularity] * u_val * dt + \
+                for step in range(nb_time_steps):
+                    u_val = EV_vars[ev_id]["u"][step].X
+                    cost_ev += market_prices[step // granularity] * u_val * dt + \
                                ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
                 cost_ev += 0.5 * ev["disconnection_time_flexibility"] * \
-                           ((ev["disconnection_time"] - EV_vars[ev_id]["t_actual"].X/granularity) ** 2)
+                           ((ev["disconnection_time"] - EV_vars[ev_id]["actual_disconnection_step"].X / granularity) ** 2)
                 cost_ev += 0.5 * ev["soc_flexibility"] * \
-                           (ev["desired_soc"] - EV_vars[ev_id]["soc"][T].X) ** 2
+                           (ev["desired_soc"] - EV_vars[ev_id]["soc"][nb_time_steps].X) ** 2
                 individual_cost[ev_id] = cost_ev
             self.results["individual_cost"] = individual_cost
             
@@ -296,7 +261,8 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
                                            for other_ev in evs if other_ev["id"] != ev_id)
                 # Build a copy of the config without EV ev.
                 config_without_ev = copy.deepcopy(self.config)
-                config_without_ev["evs"] = [other_ev for other_ev in evs if other_ev["id"] != ev_id]
+                remaining_evs = [other_ev for other_ev in evs if other_ev["id"] != ev_id]
+                config_without_ev["evs"] = remaining_evs
                 
                 # Re-run the centralized experiment for the remaining EVs.
                 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
