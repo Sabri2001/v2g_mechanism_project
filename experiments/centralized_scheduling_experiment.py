@@ -209,7 +209,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             actual_disconnection_time[ev_id] = actual_disconnection_step_val / granularity  # hours
             desired_disconnection_time[ev_id] = ev["disconnection_time"]
 
-            # Operator cost per EV
+            # Flexibility cost per EV
             soc_cost_per_ev[ev_id] = 0.5 * ev["soc_flexibility"] * (ev["desired_soc"] - ev_vars["soc"][nb_time_steps].X) ** 2
             delay_cost_per_ev[ev_id] = 0.5 * ev["disconnection_time_flexibility"] * \
                                     (ev["disconnection_time"] - actual_disconnection_time[ev_id]) ** 2
@@ -223,7 +223,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
                 u_val = ev_vars["u"][step].X
                 cost_energy = market_prices[step // granularity] * u_val * dt
                 cost_wear = ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
-                wear_cost_vector[step] += cost_energy + cost_wear
+                wear_cost_vector[step] += cost_wear
                 energy_cost_vector[step] += cost_energy
 
         total_cost = sum(energy_cost_vector) + sum(wear_cost_vector) + \
@@ -233,7 +233,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         
         # Build the main results dictionary.
         self.results = {
-            "operator_cost_over_time": wear_cost_vector,
+            "wear_cost_over_time": wear_cost_vector,
             "energy_cost_over_time": energy_cost_vector,
             "soc_cost_per_ev": soc_cost_per_ev,
             "delay_cost_per_ev": delay_cost_per_ev,
@@ -286,5 +286,75 @@ class CentralizedSchedulingExperiment(BaseExperiment):
                 vcg_tax_dict[ev_id] = original_others_cost - new_others_cost
             
             self.results["vcg_tax"] = vcg_tax_dict
-        
+
+        # 9) Value of elicitation if "value_elicitation" flag is enabled.
+        if self.config.get("value_elicitation", False):
+            try:
+                config_mean = copy.deepcopy(self.config)
+                config_mean["value_elicitation"] = False
+
+                alpha_mean = config_mean.get("alpha_mean", None)
+                if alpha_mean is None:
+                    logging.warning("value_elicitation requested but alpha_mean not found in config.")
+                else:
+                    # Set all alphas to the mean
+                    for ev_copy in config_mean["evs"]:
+                        ev_copy["disconnection_time_flexibility"] = alpha_mean
+
+                    # Run centralized experiment with uniform alpha
+                    from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
+                    experiment_mean = CentralizedSchedulingExperiment(config_mean)
+                    results_mean = experiment_mean.run()
+
+                    # Extract schedule from mean-alpha run
+                    soc_over_time_mean = results_mean["soc_over_time"]
+                    actual_disconnection_time_mean = results_mean["actual_disconnection_time"]
+
+                    # Energy and wear costs are independent of alpha/beta, so use them directly
+                    energy_cost_uniform = sum(results_mean["energy_cost_over_time"])
+                    wear_cost_uniform = sum(results_mean["wear_cost_over_time"])
+
+                    # Recalculate preference costs with REAL parameters from original config
+                    evs_real = self.config["evs"]
+                    soc_cost_uniform = {}
+                    delay_cost_uniform = {}
+                    
+                    for ev in evs_real:
+                        ev_id = ev["id"]
+                        soc_end = soc_over_time_mean[ev_id][-1]
+
+                        # SOC penalty
+                        soc_cost_uniform[ev_id] = 0.5 * ev["soc_flexibility"] * (ev["desired_soc"] - soc_end) ** 2
+
+                        # Delay penalty with REAL alpha
+                        real_alpha = ev["disconnection_time_flexibility"]
+                        desired_disc_time = ev["disconnection_time"]
+                        actual_disc_time = actual_disconnection_time_mean[ev_id]
+                        delay_cost_uniform[ev_id] = 0.5 * real_alpha * (desired_disc_time - actual_disc_time) ** 2
+
+                    # Total cost of uniform-alpha schedule evaluated with real preferences
+                    total_cost_uniform = (
+                        energy_cost_uniform +
+                        wear_cost_uniform +
+                        sum(soc_cost_uniform.values()) +
+                        sum(delay_cost_uniform.values())
+                    )
+                    # Compare to optimal cost with real alphas
+                    total_cost_real = self.results["total_cost"]
+
+                    # Percentage reduction in delay cost instead of total cost
+                    # delay_cost_uniform = sum(delay_cost_uniform.values())
+                    # delay_cost_real = sum(self.results["delay_cost_per_ev"].values())
+
+                    if total_cost_uniform > 0:
+                        perc_reduction = (total_cost_uniform - total_cost_real) / total_cost_uniform * 100
+                    else:
+                        perc_reduction = 0.0
+
+                    logging.info(f"Value elicitation reduction: {perc_reduction:.2f}%")
+                    self.results["value_elicitation"] = perc_reduction
+
+            except Exception as e:
+                logging.exception("Error while computing value_elicitation: %s", str(e))
+
         return self.results

@@ -370,7 +370,7 @@ class ConfigHandler:
 
             if desired_soc > init_soc:
                 ev_copy["initial_soc"] = init_soc
-                ev_copy["min_soc"] = init_soc
+                ev_copy["min_soc"] = 0
                 ev_copy["desired_soc"] = desired_soc
                 return ev_copy
 

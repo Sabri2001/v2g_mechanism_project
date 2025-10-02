@@ -115,7 +115,7 @@ def plot_savings(savings_by_limit):
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    plt.savefig("../outputs/tsg/xp_6/summary_cost_savings_vs_inflexibility.pdf")
+    plt.savefig("../outputs/tsg/xp_6/summary_cost_savings_vs_linear.pdf")
 
 
 if __name__ == "__main__":

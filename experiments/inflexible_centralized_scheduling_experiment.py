@@ -212,7 +212,7 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
                 u_val = ev_vars["u"][step].X
                 cost_energy = market_prices[step // granularity] * u_val * dt
                 cost_wear = ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
-                wear_cost_vector[step] += cost_energy + cost_wear
+                wear_cost_vector[step] += cost_wear
                 energy_cost_vector[step] += cost_energy
 
         total_cost = sum(energy_cost_vector) + sum(wear_cost_vector) + \
@@ -222,7 +222,7 @@ class InflexibleCentralizedSchedulingExperiment(BaseExperiment):
         
         # Build the main results dictionary.
         self.results = {
-            "operator_cost_over_time": wear_cost_vector,
+            "wear_cost_over_time": wear_cost_vector,
             "energy_cost_over_time": energy_cost_vector,
             "soc_cost_per_ev": soc_cost_per_ev,
             "delay_cost_per_ev": delay_cost_per_ev,

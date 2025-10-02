@@ -1,10 +1,9 @@
 # NAME XP
-folder: "tsg/xp_5/vcg_time_19_af_0.1_20250814_090113"
-name_xp: "vcg"
+folder: "tsg/xp_7"
+name_xp: "value_elicitation"
 
 # EXPERIMENT TYPE
 experiment_types: ["centralized"]
-
 # NUMBER OF RUNS
 num_runs: 20
 
@@ -16,18 +15,15 @@ max_iter: 100
 # SIMULATION PARAMETERS
 extreme_days: true
 stochastic: true
-override: true
-override_disconnection_time: 19
-
 time_range: [10, 22]  # Time from 10 AM to 10 PM
 seed: 42
 granularity: 4
 market_prices_csv: "../data/hub_prices.csv"
-evcs_power_limit: 10 # so oversubscription of 3.3 
-alpha_factor: 0.1
+evcs_power_limit: 10 # highly oversubscribed 
+alpha_factor: 1.0
 battery_factor: 1.0 
-
 alpha_model_path: "../models/gmm_alpha.pkl"
+alpha_mean: 62
 disconnection_model_path: "../models/gmm_disconnection_model.pkl"
 soc_model_path: "../models/initial_final_soc_kde.pkl"
 
@@ -39,7 +35,7 @@ evs:
     desired_soc: 35
     max_charge_rate: 6.6 # Caltech parking lot
     max_discharge_rate: 6.6
-    min_soc: 15 # equal to initial_soc
+    min_soc: 0
     battery_wear_cost_coefficient: 0.13 # for Nissan Leaf
     disconnection_time_flexibility: 62 
     soc_flexibility: 10
@@ -51,7 +47,7 @@ evs:
     desired_soc: 35
     max_charge_rate: 6.6
     max_discharge_rate: 6.6
-    min_soc: 15 
+    min_soc: 0 
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 60
     soc_flexibility: 10
@@ -63,7 +59,7 @@ evs:
     desired_soc: 35
     max_charge_rate: 6.6
     max_discharge_rate: 6.6
-    min_soc: 15 
+    min_soc: 0
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 54
     soc_flexibility: 10
@@ -75,7 +71,7 @@ evs:
     desired_soc: 35
     max_charge_rate: 6.6 
     max_discharge_rate: 6.6
-    min_soc: 15 # equal to initial_soc
+    min_soc: 0 
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 58
     soc_flexibility: 10
@@ -87,14 +83,14 @@ evs:
     desired_soc: 35
     max_charge_rate: 6.6
     max_discharge_rate: 6.6
-    min_soc: 15 
+    min_soc: 0
     battery_wear_cost_coefficient: 0.13
     disconnection_time_flexibility: 50
     soc_flexibility: 10
     energy_efficiency: 0.87
 
 # METRICS/RESULTS
-vcg: true
-
 plots:
   - soc_evolution
+
+value_elicitation: false
