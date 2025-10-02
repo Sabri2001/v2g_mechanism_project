@@ -9,6 +9,7 @@ from experiments.uncoordinated_charging_experiment import UncoordinatedChargingE
 from experiments.centralized_scheduling_experiment import CentralizedSchedulingExperiment
 from experiments.unidirectional_centralized_scheduling_experiment import UnidirectionalCentralizedSchedulingExperiment
 from experiments.inflexible_centralized_scheduling_experiment import InflexibleCentralizedSchedulingExperiment
+from experiments.coordinated_scheduling_experiment import CoordinatedSchedulingExperiment
 
 # Results
 from results.result_handler import ResultHandler
@@ -82,6 +83,7 @@ def main(config_path):
         "centralized": CentralizedSchedulingExperiment,
         "unidirectional_centralized": UnidirectionalCentralizedSchedulingExperiment,
         "inflexible_centralized": InflexibleCentralizedSchedulingExperiment,
+        "coordinated": CoordinatedSchedulingExperiment,
     }
 
     experiment_types = config.get("experiment_types", [])
