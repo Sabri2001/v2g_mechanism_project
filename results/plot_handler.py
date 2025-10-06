@@ -105,3 +105,63 @@ class PlotHandler:
         plt.savefig(output_path, bbox_inches='tight')
         plt.close()
         logging.info(f"Plot 'soc_evolution' saved to {output_path}")
+
+    @staticmethod
+    def plot_nash_grid(tau_values, alpha_values, cost_grid, output_path, true_tau=None, true_alpha=None):
+        """
+        Plot a heatmap (grid) of the target EV's utility as a function of its bid parameters.
+        - tau_values (x-axis): candidate disconnection_time bids.
+        - alpha_values (y-axis): candidate disconnection_time_flexibility bids.
+        - cost_grid: a 2D array (shape: len(alpha_values) x len(tau_values))
+        where each cell is the EV's utility computed as energy_cost + congestion_cost + adaptability_cost.
+        - If true_tau and true_alpha are provided, the cell matching these values is highlighted 
+        with a thick blue border. The colormap runs from green (low cost) to red (high cost).
+        """
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        from matplotlib.patches import Rectangle
+        import logging
+
+        # Set the overall style for the plot.
+        sns.set(style="whitegrid")
+        plt.figure(figsize=(8, 6))
+
+        # Use the reversed RdYlGn colormap so that low values are green and high values are red.
+        cmap = "RdYlGn_r"
+        ax = sns.heatmap(
+            cost_grid,
+            xticklabels=tau_values,
+            yticklabels=alpha_values,
+            cmap=cmap,
+            annot=True,
+            fmt=".2f"
+        )
+
+        # Increase font size for the axis labels.
+        plt.xlabel("Bid: disconnection time (h)", labelpad=15, fontsize=15)
+        plt.ylabel("Bid: flexibility coefficient ($/h²)", labelpad=15, fontsize=15)
+        
+        # Increase font size for tick labels.
+        ax.tick_params(axis='both', which='major', labelsize=15)
+
+        # Increase font size for the colorbar ticks.
+        cbar = ax.collections[0].colorbar
+        cbar.ax.tick_params(labelsize=15)
+        
+        # Add a legend for the color bar with increased label distance.
+        cbar.set_label("Utility ($)", fontsize=15, labelpad=15)
+
+        # If true_tau and true_alpha are provided, highlight that cell.
+        if true_tau is not None and true_alpha is not None:
+            try:
+                col_index = tau_values.index(true_tau)
+                row_index = alpha_values.index(true_alpha)
+                rect = Rectangle((col_index, row_index), 1, 1, fill=False, edgecolor='blue', lw=3)
+                ax.add_patch(rect)
+            except ValueError:
+                logging.warning("True bid values not found in the candidate lists; skipping cell highlight.")
+
+        plt.tight_layout()
+        plt.savefig(output_path)
+        plt.close()
+        logging.info(f"Plot 'nash_grid' saved to {output_path}")

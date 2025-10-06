@@ -310,8 +310,6 @@ class ConfigHandler:
         start_time, end_time = self.config["time_range"]
         sampled_evs = []
 
-        alpha_deterministic = self.config.get("alpha_deterministic", False)
-
         for ev in self.config["evs"]:
             ev_copy = ev.copy()
 
@@ -319,33 +317,27 @@ class ConfigHandler:
             alpha_idx = self.random_state.choice(len(alpha_weights), p=alpha_weights)
             alpha_mean = alpha_means[alpha_idx][0]
             alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])  # 1D
-            if not alpha_deterministic:
-                alpha_idx = self.random_state.choice(len(alpha_weights), p=alpha_weights)
-                alpha_mean = alpha_means[alpha_idx][0]
-                alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])
-                sampled_alpha = self.random_state.normal(loc=alpha_mean, scale=alpha_std)
-                ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor, 5)
-            else:
-                ev_copy["disconnection_time_flexibility"] = round(
-                    ev_copy["disconnection_time_flexibility"] * self.alpha_factor, 5
-                )
+            alpha_idx = self.random_state.choice(len(alpha_weights), p=alpha_weights)
+            alpha_mean = alpha_means[alpha_idx][0]
+            alpha_std = np.sqrt(alpha_covs[alpha_idx][0][0])
+            sampled_alpha = self.random_state.normal(loc=alpha_mean, scale=alpha_std)
+            ev_copy["disconnection_time_flexibility"] = round(sampled_alpha * self.alpha_factor, 5)
 
             # 2) Sample disconnect_time
-            if (self.config.get("override", False) 
-                and ev["id"] == 0 
-                and self.config["stochastic"]):
-                # Force override for EV 0
-                ev_copy["disconnection_time"] = self.config["override_disconnection_time"]
-            else:
-                disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)
-                disc_mean = disc_means[disc_idx][0]
-                disc_std = np.sqrt(disc_covs[disc_idx][0][0])
-                sampled_disconnect = int(round(self.random_state.normal(loc=disc_mean, scale=disc_std)))
-                # Clamp to valid time range
-                ev_copy["disconnection_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
+            disc_idx = self.random_state.choice(len(disc_weights), p=disc_weights)
+            disc_mean = disc_means[disc_idx][0]
+            disc_std = np.sqrt(disc_covs[disc_idx][0][0])
+            sampled_disconnect = int(round(self.random_state.normal(loc=disc_mean, scale=disc_std)))
+            # Clamp to valid time range
+            ev_copy["disconnection_time"] = max(start_time + 1, min(end_time, sampled_disconnect))
 
             # 3) Sample (initial_soc, desired_soc) and min_soc
             ev_copy = self._sample_soc(ev_copy)
+
+            if self.config.get("override_ev", False) and ev["id"] == self.config["override_ev_id"]:
+                # Force override for EV 0
+                ev_copy["disconnection_time"] = self.config["disconnection_time_bid"]
+                ev_copy["disconnection_time_flexibility"] = self.config["disconnection_time_flexibility_bid"]
 
             sampled_evs.append(ev_copy)
 
