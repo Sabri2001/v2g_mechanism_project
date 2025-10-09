@@ -20,10 +20,10 @@ def extract_metadata(path):
     else:
         return None, None
 
-def load_costs(log_path):
+def load_results(log_path):
     with open(log_path, 'r') as f:
         log = json.load(f)
-    return log['results']['total_cost']
+    return log['results']
 
 def collect_data(base_dir="../outputs/tsg/xp_6"):
     data = defaultdict(lambda: {"centralized": [], "uncoordinated": []})
@@ -41,7 +41,11 @@ def collect_data(base_dir="../outputs/tsg/xp_6"):
             for run_dir in run_dirs:
                 log_file = os.path.join(run_dir, "log.json")
                 if os.path.exists(log_file):
-                    cost = load_costs(log_file)
+                    results = load_results(log_file)
+                    if exp_type == "uncoordinated":
+                        cost = results["total_cost"]
+                    else:  # centralized
+                        cost = sum(results["individual_cost"].values()) + sum(results.get("vcg_tax", {}).values())
                     data[(limit_factor, alpha_factor)][exp_type].append(cost)
 
     return data

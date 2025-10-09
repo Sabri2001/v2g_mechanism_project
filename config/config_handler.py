@@ -339,6 +339,9 @@ class ConfigHandler:
                 ev_copy["disconnection_time"] = self.config["disconnection_time_bid"]
                 ev_copy["disconnection_time_flexibility"] = self.config["disconnection_time_flexibility_bid"]
 
+            if self.config.get("override_disconnection_time", None) is not None:
+                ev_copy["disconnection_time"] = self.config["override_disconnection_time"]
+
             sampled_evs.append(ev_copy)
 
         return sampled_evs

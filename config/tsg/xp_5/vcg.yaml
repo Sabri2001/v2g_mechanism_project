@@ -16,7 +16,6 @@ max_iter: 100
 # SIMULATION PARAMETERS
 extreme_days: true
 stochastic: true
-override: true
 override_disconnection_time: 17
 
 time_range: [10, 22]  # Time from 10 AM to 10 PM

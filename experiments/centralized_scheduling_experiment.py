@@ -243,6 +243,7 @@ class CentralizedSchedulingExperiment(BaseExperiment):
             "desired_disconnection_time": desired_disconnection_time,
             "actual_disconnection_time": actual_disconnection_time,
             "solve_time": solve_time,
+            "market_prices": market_prices,
         }
 
         
@@ -250,20 +251,22 @@ class CentralizedSchedulingExperiment(BaseExperiment):
         if self.config.get("vcg", False):
             # First, compute the individual cost incurred by each EV in the full run.
             individual_cost = {}
+            individual_energy_cost = {}
             for ev in evs:
                 ev_id = ev["id"]
                 cost_ev = 0.0
                 for step in range(nb_time_steps):
                     u_val = EV_vars[ev_id]["u"][step].X
-                    cost_ev += market_prices[step // granularity] * u_val * dt + \
-                               ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
+                    individual_energy_cost[ev_id] = market_prices[step // granularity] * u_val * dt 
+                    cost_ev += ev["battery_wear_cost_coefficient"] * abs(u_val) * ev["energy_efficiency"] * dt
+                    individual_energy_cost[ev_id] = cost_ev
                 cost_ev += 0.5 * ev["disconnection_time_flexibility"] * \
                            ((ev["disconnection_time"] - EV_vars[ev_id]["actual_disconnection_step"].X / granularity) ** 2)
                 cost_ev += 0.5 * ev["soc_flexibility"] * \
                            (ev["desired_soc"] - EV_vars[ev_id]["soc"][nb_time_steps].X) ** 2
                 individual_cost[ev_id] = cost_ev
-            self.results["individual_cost"] = individual_cost
-            
+            self.results["individual_cost"] = individual_cost # does not include energy cost
+
             vcg_tax_dict = {}
             for ev in evs:
                 ev_id = ev["id"]
@@ -282,8 +285,8 @@ class CentralizedSchedulingExperiment(BaseExperiment):
                 individual_cost_without_ev = results_without_ev.get("individual_cost", {})
                 new_others_cost = sum(individual_cost_without_ev.values())
                 
-                # The VCG tax for ev is the increase in others' cost due to its presence.
-                vcg_tax_dict[ev_id] = original_others_cost - new_others_cost
+                # The VCG tax of each EV is the increase in the other EVs' and the EVCS' cost due to its presence (energy is assumed to be a cost of the EVCS).
+                vcg_tax_dict[ev_id] = original_others_cost - new_others_cost + individual_energy_cost[ev_id]
             
             self.results["vcg_tax"] = vcg_tax_dict
 

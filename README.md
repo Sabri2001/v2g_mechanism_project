@@ -10,12 +10,15 @@ We conclude with numerical simulations using real data to study the value of def
 
 ## Project Structure
 
-- **analyses/**: Energy efficiency and stochastic initial/final state of charge analyses
-- **config/**: Configuration files for running experiments
-- **experiment_mains/**: Main experiment execution files
-- **experiments/**: Experiment specification files
-- **preprocessing/**: Data preprocessing and formatting scripts
-- **results/**: Output data and analysis results
+- **analyses/**: Notebooks for preliminary analysis of the datasets used in the simulations
+- **config/**: Configuration files for running the experiments
+- **run_experiments/**: Bash files for running the experiments
+- **experiments_runners/**: Helper for running experiments
+- **experiments/**: Charge schedulers
+- **preprocessing/**: Data preprocessing and formatting script
+- **results/**: Result and plot handlers
+- **plot_experiments/**: Scripts for individual experiment plots
+- **log_experiments/**: Scripts for individual experiment logs
 
 ## Key Features
 
@@ -24,6 +27,19 @@ We conclude with numerical simulations using real data to study the value of def
 - VCG mechanism implementation for truthful user preference elicitation
 - Temporal flexibility analysis of EV charging scenarios
 - Simulation framework using real-world EV charging data
+
+## Experiments legend
+- **Experiment 1/**: Effect of battery wear costs on charge schedule
+- **Experiment 2/**: Cost savings from bidirectional charging as a function of battery wear costs
+- **Experiment 3/**: Effect of station congestion on charge schedule
+- **Experiment 4/**: Cost savings from temporal flexibility as a function of station congestion
+- **Experiment 5/**: VCG tax as a function of the charging request
+- **Experiment 6/**: Indidividual cost savings from optimal charging with VCG taxes
+- **Experiment 7/**: Costs saved from reporting temporal flexibilities to the scheduler
+- **Experiment 8/**: Optimality gap with ADMM
+- **Experiment 9/**: Utility of EVs as a function of their bids in the absence of taxes
+- **Experiment 10/**: Occurence of a negative VCG tax
+
 
 ## Getting Started
 

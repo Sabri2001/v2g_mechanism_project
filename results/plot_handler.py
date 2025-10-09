@@ -8,21 +8,128 @@ import pandas as pd
 
 
 class PlotHandler:
+    # @staticmethod
+    # def plot_soc_evolution(schedule_results, time_axis, output_path, ev_config):
+    #     import matplotlib.ticker as ticker
+    #     sns.set(style="whitegrid")
+    #     ev_ids = list(schedule_results["soc_over_time"].keys())
+    #     num_evs = len(ev_ids)
+
+    #     fig, axes = plt.subplots(
+    #         num_evs, 1, figsize=(14, 1.5 * num_evs), sharex=True,
+    #         gridspec_kw={'hspace': 0.7}
+    #     )
+    #     if num_evs == 1:
+    #         axes = [axes]
+
+    #     for ax, ev_id in zip(axes, ev_ids):
+    #         # Fetch EV config and normalize SoC
+    #         ev = next(ev for ev in ev_config["evs"] if ev["id"] == ev_id)
+    #         battery_capacity = ev["battery_capacity"]
+    #         min_soc = 0
+    #         raw_soc = np.array(schedule_results["soc_over_time"][ev_id])
+    #         normalized_soc = (
+    #             (raw_soc - min_soc) / (battery_capacity - min_soc)
+    #             if battery_capacity != min_soc else np.zeros_like(raw_soc)
+    #         )
+
+    #         # Plot SoC as an image
+    #         ax.imshow(
+    #             [normalized_soc],
+    #             aspect='auto',
+    #             cmap='RdYlGn',
+    #             vmin=0,
+    #             vmax=1,
+    #             extent=[time_axis[0], time_axis[-1], 0, 1],
+    #             interpolation='bilinear',
+    #             origin='lower'
+    #         )
+
+    #         # Desired / actual disconnection lines
+    #         desired_time = schedule_results["desired_disconnection_time"][ev_id]
+    #         actual_time = schedule_results["actual_disconnection_time"][ev_id]
+    #         offset = 0.05  # adjust as needed based on time scale resolution
+    #         ax.axvline(desired_time - offset, color='magenta', linewidth=4, linestyle='-',
+    #                 label='Desired Disconnection')
+    #         ax.axvline(actual_time + offset, color='darkblue', linewidth=4, linestyle='-',
+    #                 label='Actual Disconnection')
+
+    #         # Hide y-axis ticks and label each row with EV ID
+    #         ax.set_yticks([])
+    #         ax.set_ylabel(str(ev_id + 1), rotation=0, labelpad=15, fontsize=30,
+    #                     ha='center', va='center')
+    #         ax.set_xlim(time_axis[0], time_axis[-1])
+
+    #     # Label the shared x-axis with "Time (h)" and increased font size
+    #     plt.xlabel("Time (h)", fontsize=30, labelpad=30)
+    #     for ax in axes:
+    #         ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    #         # Format hours as two-digit numbers (e.g., "10") without ":00"
+    #         ax.xaxis.set_major_formatter(
+    #             ticker.FuncFormatter(lambda x, pos: f"{int(x):02d}")
+    #         )
+    #         ax.tick_params(axis='x', labelsize=30)
+
+    #     fig.subplots_adjust(left=0.12,
+    #                         right=0.84,
+    #                         bottom=0.15,
+    #                         top=0.95)
+
+    #     # Colorbar on the right
+    #     cbar = fig.colorbar(
+    #         plt.cm.ScalarMappable(cmap='RdYlGn', norm=plt.Normalize(0, 1)),
+    #         ax=axes,
+    #         orientation='vertical',
+    #         fraction=0.03,
+    #         pad=0.07,
+    #         shrink=0.8
+    #     )
+    #     cbar.set_label('State of Charge (%)', fontsize=30)
+    #     cbar.set_ticks([0, 1])
+    #     cbar.set_ticklabels(['0 %', '100 %'])
+    #     cbar.ax.tick_params(labelsize=30)
+
+    #     # EVs label slightly further from plots
+    #     fig.text(0.05, 0.55, 'EVs', va='center', rotation='vertical', fontsize=30)
+
+    #     # Retrieve the line handles for desired/actual and place legend further below the plot
+    #     handles, labels = axes[0].get_legend_handles_labels()
+    #     fig.legend(
+    #         handles, labels,
+    #         loc='lower center',
+    #         bbox_to_anchor=(0.45, -0.20),
+    #         ncol=2,
+    #         fontsize=30
+    #     )
+
+    #     plt.savefig(output_path, bbox_inches='tight')
+    #     plt.close()
+    #     logging.info(f"Plot 'soc_evolution' saved to {output_path}")
+
     @staticmethod
     def plot_soc_evolution(schedule_results, time_axis, output_path, ev_config):
         import matplotlib.ticker as ticker
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
         sns.set(style="whitegrid")
         ev_ids = list(schedule_results["soc_over_time"].keys())
         num_evs = len(ev_ids)
-
+        
+        # Get market prices from results
+        market_prices = schedule_results.get("market_prices", [])
+        
+        # Create subplots: num_evs for SoC + 1 for market prices
         fig, axes = plt.subplots(
-            num_evs, 1, figsize=(14, 1.5 * num_evs), sharex=True,
+            num_evs + 1, 1, figsize=(14, 1.5 * num_evs + 1.5), sharex=True,
             gridspec_kw={'hspace': 0.7}
         )
-        if num_evs == 1:
+        if num_evs == 0:
             axes = [axes]
-
-        for ax, ev_id in zip(axes, ev_ids):
+        
+        # Separate EV axes from market price axis
+        ev_axes = axes[:-1] if num_evs > 0 else []
+        market_ax = axes[-1]
+        
+        for ax, ev_id in zip(ev_axes, ev_ids):
             # Fetch EV config and normalize SoC
             ev = next(ev for ev in ev_config["evs"] if ev["id"] == ev_id)
             battery_capacity = ev["battery_capacity"]
@@ -32,7 +139,7 @@ class PlotHandler:
                 (raw_soc - min_soc) / (battery_capacity - min_soc)
                 if battery_capacity != min_soc else np.zeros_like(raw_soc)
             )
-
+            
             # Plot SoC as an image
             ax.imshow(
                 [normalized_soc],
@@ -44,56 +151,119 @@ class PlotHandler:
                 interpolation='bilinear',
                 origin='lower'
             )
-
+            
             # Desired / actual disconnection lines
             desired_time = schedule_results["desired_disconnection_time"][ev_id]
             actual_time = schedule_results["actual_disconnection_time"][ev_id]
-            offset = 0.05  # adjust as needed based on time scale resolution
+            offset = 0.05
             ax.axvline(desired_time - offset, color='magenta', linewidth=4, linestyle='-',
                     label='Desired Disconnection')
             ax.axvline(actual_time + offset, color='darkblue', linewidth=4, linestyle='-',
                     label='Actual Disconnection')
-
+            
             # Hide y-axis ticks and label each row with EV ID
             ax.set_yticks([])
             ax.set_ylabel(str(ev_id + 1), rotation=0, labelpad=15, fontsize=30,
                         ha='center', va='center')
             ax.set_xlim(time_axis[0], time_axis[-1])
-
-        # Label the shared x-axis with "Time (h)" and increased font size
+        
+        # ✅ Plot market prices in the additional bottom bar (same length as SoC bars)
+        if len(market_prices) > 0:
+            min_price = np.min(market_prices)
+            max_price = np.max(market_prices)
+            normalized_prices = (np.array(market_prices) - min_price) / \
+                                (max_price - min_price) \
+                                if max_price != min_price \
+                                else np.zeros_like(market_prices)
+            
+            # Force same visual dimensions as SoC bars
+            market_ax.imshow(
+                [normalized_prices],
+                aspect='auto',
+                cmap='Blues',
+                vmin=0,
+                vmax=1,
+                extent=[time_axis[0], time_axis[-1], 0, 1],
+                interpolation='bilinear',
+                origin='lower'
+            )
+        
+        market_ax.set_yticks([])
+        market_ax.set_ylabel('', rotation=0, labelpad=15, fontsize=30,
+                            ha='center', va='center')
+        market_ax.set_xlim(time_axis[0], time_axis[-1])
+        
         plt.xlabel("Time (h)", fontsize=30, labelpad=30)
         for ax in axes:
             ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
-            # Format hours as two-digit numbers (e.g., "10") without ":00"
             ax.xaxis.set_major_formatter(
                 ticker.FuncFormatter(lambda x, pos: f"{int(x):02d}")
             )
             ax.tick_params(axis='x', labelsize=30)
-
+        
         fig.subplots_adjust(left=0.12,
-                            right=0.84,
+                            right=0.70,
                             bottom=0.15,
                             top=0.95)
-
-        # Colorbar on the right
-        cbar = fig.colorbar(
+        
+        # SoC Colorbar (unchanged)
+        cbar_soc = fig.colorbar(
             plt.cm.ScalarMappable(cmap='RdYlGn', norm=plt.Normalize(0, 1)),
-            ax=axes,
+            ax=ev_axes,
             orientation='vertical',
             fraction=0.03,
             pad=0.07,
             shrink=0.8
         )
-        cbar.set_label('State of Charge (%)', fontsize=30)
-        cbar.set_ticks([0, 1])
-        cbar.set_ticklabels(['0 %', '100 %'])
-        cbar.ax.tick_params(labelsize=30)
-
-        # EVs label slightly further from plots
+        cbar_soc.set_label('State of Charge (%)', fontsize=30)
+        cbar_soc.set_ticks([0, 1])
+        cbar_soc.set_ticklabels(['0 %', '100 %'])
+        cbar_soc.ax.tick_params(labelsize=30)
+        
+        # Market Price Colorbar (independent positioning to match SoC colorbar width)
+        if len(market_prices) > 0:
+            # Get the SoC colorbar position and an EV axis position to match dimensions
+            soc_cbar_pos = cbar_soc.ax.get_position()
+            ev_ax_pos = ev_axes[0].get_position() if len(ev_axes) > 0 else None
+            
+            # Match the market_ax position to EV axes dimensions
+            if ev_ax_pos:
+                market_ax_pos = market_ax.get_position()
+                market_ax.set_position([
+                    ev_ax_pos.x0,
+                    market_ax_pos.y0,
+                    ev_ax_pos.width,
+                    market_ax_pos.height
+                ])
+                market_ax_pos = market_ax.get_position()
+            else:
+                market_ax_pos = market_ax.get_position()
+            
+            # Create colorbar axis manually with 1.5x height
+            cbar_height = market_ax_pos.height * 1.5
+            cbar_width = soc_cbar_pos.width
+            
+            cax_price = fig.add_axes([
+                soc_cbar_pos.x0,
+                market_ax_pos.y0 + (market_ax_pos.height - cbar_height) / 2,
+                cbar_width,
+                cbar_height
+            ])
+            
+            cbar_price = fig.colorbar(
+                plt.cm.ScalarMappable(cmap='Blues', norm=plt.Normalize(0, 1)),
+                cax=cax_price,
+                orientation='vertical'
+            )
+            fig.text(0.79, 0.20, 'Price', va='center', rotation='vertical', fontsize=30)
+            fig.text(0.82, 0.20, '($/kWh)', va='center', rotation='vertical', fontsize=25)
+            cbar_price.set_ticks([0, 1])
+            cbar_price.set_ticklabels([f'{min_price:.3f}', f'{max_price:.3f}'])
+            cbar_price.ax.tick_params(labelsize=30)
+        
         fig.text(0.05, 0.55, 'EVs', va='center', rotation='vertical', fontsize=30)
-
-        # Retrieve the line handles for desired/actual and place legend further below the plot
-        handles, labels = axes[0].get_legend_handles_labels()
+        
+        handles, labels = ev_axes[0].get_legend_handles_labels()
         fig.legend(
             handles, labels,
             loc='lower center',
@@ -101,7 +271,7 @@ class PlotHandler:
             ncol=2,
             fontsize=30
         )
-
+        
         plt.savefig(output_path, bbox_inches='tight')
         plt.close()
         logging.info(f"Plot 'soc_evolution' saved to {output_path}")

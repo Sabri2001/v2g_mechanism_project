@@ -74,7 +74,7 @@ class ResultHandler:
         requested_plots: List[str] = self.config.get("plots", [])
 
         # Set up the time axis
-        start_time, end_time = self.config["time_range"]
+        start_time, _ = self.config["time_range"]
         nb_time_steps = self.config["nb_time_steps"]
         time_axis = [start_time + step*self.config["dt"] for step in range(nb_time_steps + 1)]
 
