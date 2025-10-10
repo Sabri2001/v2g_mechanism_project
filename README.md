@@ -29,16 +29,16 @@ We conclude with numerical simulations using real data to study the value of def
 - Simulation framework using real-world EV charging data
 
 ## Experiments legend
-- **Experiment 1/**: Effect of battery wear costs on charge schedule
-- **Experiment 2/**: Cost savings from bidirectional charging as a function of battery wear costs
-- **Experiment 3/**: Effect of station congestion on charge schedule
-- **Experiment 4/**: Cost savings from temporal flexibility as a function of station congestion
-- **Experiment 5/**: VCG tax as a function of the charging request
-- **Experiment 6/**: Indidividual cost savings from optimal charging with VCG taxes
-- **Experiment 7/**: Costs saved from reporting temporal flexibilities to the scheduler
-- **Experiment 8/**: Optimality gap with ADMM
-- **Experiment 9/**: Utility of EVs as a function of their bids in the absence of taxes
-- **Experiment 10/**: Occurence of a negative VCG tax
+- **Experiment 1**: Effect of battery wear costs on charge schedule
+- **Experiment 2**: Cost savings from bidirectional charging as a function of battery wear costs
+- **Experiment 3**: Effect of station congestion on charge schedule
+- **Experiment 4**: Cost savings from temporal flexibility as a function of station congestion
+- **Experiment 5**: VCG tax as a function of the charging request
+- **Experiment 6**: Indidividual cost savings from optimal charging with VCG taxes
+- **Experiment 7**: Costs saved from reporting temporal flexibilities to the scheduler
+- **Experiment 8**: Optimality gap with ADMM
+- **Experiment 9**: Utility of EVs as a function of their bids in the absence of taxes
+- **Experiment 10**: Occurence of a negative VCG tax
 
 
 ## Getting Started
