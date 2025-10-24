@@ -71,6 +71,7 @@ def compute_savings(data):
     return result
 
 def plot_savings(savings_by_alpha):
+    plt.rcParams.update({'font.size': 20})
     plt.figure(figsize=(10, 6))
     for alpha, points in savings_by_alpha.items():
         x = [p[0] for p in points]
@@ -78,8 +79,8 @@ def plot_savings(savings_by_alpha):
         yerr = [p[2] for p in points]
         plt.errorbar(x, y, yerr=yerr, label=f"Inflexibility (cost of 1-hour delay): {round(alpha * 31.2)} $", marker='o', capsize=4)
 
-    plt.xlabel("Battery Wear Cost ($/kWh)")
-    plt.ylabel("Cost Savings (%)")
+    plt.xlabel("Battery Wear Cost ($/kWh)", labelpad=15)
+    plt.ylabel("Cost Savings (%)", labelpad=15)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
@@ -91,3 +92,4 @@ if __name__ == "__main__":
     print(f"Collected data for {len(data)} configurations.")
     savings_by_alpha = compute_savings(data)
     plot_savings(savings_by_alpha)
+    

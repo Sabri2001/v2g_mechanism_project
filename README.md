@@ -56,9 +56,6 @@ conda activate v2g
 python main.py --config configs/config.yaml
 ```
 
-## Results
-Our findings demonstrate that leveraging the temporal flexibility of EV users can significantly reduce charging station operational costs while maintaining service quality. The game-theoretic mechanism ensures truthful reporting of user preferences, creating a fair and efficient charging ecosystem.
-
 ## License
 This project is available under the [MIT License](LICENSE).
 

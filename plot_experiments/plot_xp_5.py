@@ -57,6 +57,7 @@ def compute_mean_vcg(data):
     return result
 
 def plot_vcg(mean_vcg):
+    plt.rcParams.update({'font.size': 20})
     fig, ax = plt.subplots(figsize=(11, 6))
 
     # Extract sorted unique values for grid
@@ -81,7 +82,7 @@ def plot_vcg(mean_vcg):
     # Label x-axis with disconnection times
     ax.set_xticks(range(len(disconnection_times)))
     ax.set_xticklabels(disconnection_times)
-    ax.set_xlabel("Desired disconnection time (h)")
+    ax.set_xlabel("Desired disconnection time (h)", labelpad=15, fontsize=20)
 
     # Remove y-axis ticks (we’ll add alpha labels manually)
     ax.set_yticks([])
@@ -90,18 +91,18 @@ def plot_vcg(mean_vcg):
     for i, alpha in enumerate(alpha_factors):
         ax.text(
             -0.6, i, f"{round(alpha*32)}",
-            va="center", ha="right", fontsize=10
+            va="center", ha="right", fontsize=20
         )
 
     # Add colorbar
     cbar = plt.colorbar(im, ax=ax)
-    cbar.set_label("Mean VCG tax ($)")
+    cbar.set_label("Mean VCG tax ($)", labelpad=15, fontsize=20)
 
     # Add a "legend-like" label for alpha values
     # (using axes coordinates so it won't be clipped)
     ax.text(
-        -0.1, 0.5, "Inflexibility (cost of 1-hour delay in $)",
-        rotation=90, va="center", ha="center", fontsize=12,
+        -0.15, 0.5, "Inflexibility (cost of 1-hour delay in $)",
+        rotation=90, va="center", ha="center", fontsize=20,
         transform=ax.transAxes   # <-- anchor to axes, not data
     )
 

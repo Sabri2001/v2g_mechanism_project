@@ -6,7 +6,7 @@ Usage:
     python plot_xp_9.py <results_pattern> <target_ev_id> <true_tau> <true_alpha> <tau1> <tau2> ... --- <alpha1> <alpha2> ...
 
 Example:
-    python plot_xp_9.py ../outputs/tsg/xp_9/tau_17_alpha_50_20251003_102819 0 19 60 17 18 19 --- 50 60 70
+    python plot_xp_9.py ../outputs/tsg/xp_9/tau_17_alpha_50_20251003_102819 0 19 60 17 18 19 20 21 --- 40 50 60 70 80
 """
 
 import os
@@ -133,7 +133,8 @@ def plot_incentive_lie_grid(tau_values, alpha_values, cost_grid, output_path,
     Plot a heatmap showing utility as a function of bid parameters.
     Highlight the truthful bid cell.
     """
-    sns.set(style="whitegrid")
+    # sns.set(style="whitegrid")
+    plt.rcParams.update({'font.size': 20})
     plt.figure(figsize=(10, 8))
     
     cmap = "RdYlGn_r"  # Green = low cost (good), Red = high cost (bad)
@@ -143,20 +144,22 @@ def plot_incentive_lie_grid(tau_values, alpha_values, cost_grid, output_path,
         xticklabels=tau_values,
         yticklabels=alpha_values,
         cmap=cmap,
-        annot=True,
+        annot=False,
         fmt=".2f",
         cbar_kws={'label': 'Utility ($)'}
     )
+
+    ax.invert_yaxis()
     
-    plt.xlabel("Bid: disconnection time (h)", labelpad=15, fontsize=16)
-    plt.ylabel("Bid: flexibility coefficient ($/h²)", labelpad=15, fontsize=16)
+    plt.xlabel("Bid: disconnection time (h)", labelpad=15, fontsize=20)
+    plt.ylabel("Bid: inflexibility coefficient ($/h²)", labelpad=15, fontsize=20)
     
-    ax.tick_params(axis='both', which='major', labelsize=14)
+    ax.tick_params(axis='both', which='major', labelsize=20)
     
     cbar = ax.collections[0].colorbar
-    cbar.ax.tick_params(labelsize=14)
-    cbar.set_label("Total cost ($)", fontsize=16, labelpad=15)
-    
+    cbar.ax.tick_params(labelsize=20)
+    cbar.set_label("Total cost ($)", fontsize=20, labelpad=15)
+
     # Highlight the truthful bid cell
     if true_tau in tau_values and true_alpha in alpha_values:
         col_index = tau_values.index(true_tau)
@@ -168,10 +171,10 @@ def plot_incentive_lie_grid(tau_values, alpha_values, cost_grid, output_path,
         ax.add_patch(rect)
         
         plt.text(
-            0.02, 0.98, 
+            0.03, 0.07, 
             f'Blue box = truthful bid ({true_tau}, {true_alpha})',
             transform=ax.transAxes,
-            fontsize=12,
+            fontsize=20,
             verticalalignment='top',
             bbox=dict(boxstyle='round', facecolor='white', alpha=0.8)
         )

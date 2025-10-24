@@ -9,6 +9,9 @@ dependencies:
   - seaborn
   - scikit-learn=1.5.2
   - pyyaml
+  - openpyxl
+  - jupyterlab
+  - ipykernel
   - pip
   - pip:
       - gurobipy

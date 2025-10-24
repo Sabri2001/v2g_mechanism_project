@@ -75,6 +75,7 @@ def compute_savings(data):
     return result
 
 def plot_savings(savings_by_limit):
+    plt.rcParams.update({'font.size': 20})
     plt.figure(figsize=(10, 6))
 
     # Collect all distinct inflexibility values
@@ -98,8 +99,8 @@ def plot_savings(savings_by_limit):
             marker='o', capsize=4
         )
 
-    plt.xlabel("EVCS power limit (kW)")
-    plt.ylabel("Cost Savings (%)")
+    plt.xlabel("EVCS power limit (kW)", labelpad=15)
+    plt.ylabel("Cost Savings (%)", labelpad=15)
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
