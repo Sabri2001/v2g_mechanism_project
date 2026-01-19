@@ -1,5 +1,7 @@
 # Scheduling the Charge of Temporally Flexible Electric Vehicles: A Game-Theoretic Approach
 
+This repo containts the code for reproducing the experiments from the paper [Scheduling the Charge of Temporally Flexible Electric Vehicles: a Market-based Approach](https://arxiv.org/abs/2512.15583).
+
 ## Abstract
 
 With the rise of intermittent renewable energy sources and the massive electrification of our activities, the grid is coming under increasing pressure. Through vehicle-to-grid (V2G) services, electric vehicles (EVs) offer a promising approach for mitigating infrastructure constraints at EV charging stations (EVCS) while also serving as backup capacity for the grid. In this work, we explore how the flexibility in the departure time of EV drivers can be exploited to amplify these benefits.
